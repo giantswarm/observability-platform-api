@@ -2,9 +2,26 @@ version: 2.1
 orbs:
   architect: giantswarm/architect@5.11.4
 
+jobs:
+  template-chart:
+    docker:
+    - image: giantswarm/helm-chart-testing:v3.11.0
+    steps:
+    - checkout
+    - run: |-
+        cd helm/observability-platform-api
+        helm dependency update
+        helm template .
+
 workflows:
-  package-and-push-chart-on-tag:
+  build:
     jobs:
+    - template-chart:
+        name: template-chart
+        filters:
+          tags:
+            only: /^v.*/
+
     - architect/push-to-app-catalog:
         context: architect
         executor: app-build-suite
@@ -20,3 +37,73 @@ workflows:
             ignore:
             - main
             - master
+
+    - architect/push-to-app-collection:
+        context: architect
+        name: capa-app-collection
+        app_name: observability-platform-api
+        app_namespace: monitoring
+        app_collection_repo: capa-app-collection
+        requires:
+        - package-and-push-chart
+        filters:
+          branches:
+            ignore: /.*/
+          tags:
+            only: /^v.*/
+
+    - architect/push-to-app-collection:
+        context: architect
+        name: capz-app-collection
+        app_name: observability-platform-api
+        app_namespace: monitoring
+        app_collection_repo: capz-app-collection
+        requires:
+        - package-and-push-chart
+        filters:
+          branches:
+            ignore: /.*/
+          tags:
+            only: /^v.*/
+
+    - architect/push-to-app-collection:
+        context: architect
+        name: cloud-director-app-collection
+        app_name: observability-platform-api
+        app_namespace: monitoring
+        app_collection_repo: cloud-director-app-collection
+        requires:
+        - package-and-push-chart
+        filters:
+          branches:
+            ignore: /.*/
+          tags:
+            only: /^v.*/
+
+    - architect/push-to-app-collection:
+        context: architect
+        name: vsphere-app-collection
+        app_name: observability-platform-api
+        app_namespace: monitoring
+        app_collection_repo: vsphere-app-collection
+        requires:
+        - package-and-push-chart
+        filters:
+          branches:
+            ignore: /.*/
+          tags:
+            only: /^v.*/
+
+    - architect/push-to-app-collection:
+        context: architect
+        name: proxmox-app-collection
+        app_name: observability-platform-api
+        app_namespace: monitoring
+        app_collection_repo: proxmox-app-collection
+        requires:
+        - package-and-push-chart
+        filters:
+          branches:
+            ignore: /.*/
+          tags:
+            only: /^v.*/
