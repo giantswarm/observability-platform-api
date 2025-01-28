@@ -1,0 +1,9 @@
+apiVersion: v2
+appVersion: 0.0.1
+name: observability-platform-api
+description: Giant Swarm Observability Platform API definition
+home: https://github.com/giantswarm/observability-platform-api
+icon: https://s.giantswarm.io/app-icons/giantswarm/1/light.svg
+version: 0.0.0-dev
+annotations:
+  application.giantswarm.io/team: atlas
