@@ -3,11 +3,11 @@
 
 # Observability Platform API
 
-Giant Swarm provides an Observability Platform api as the main entrypoint to its Observability Platformplatform.
+Giant Swarm provides an Observability Platform API as the main entry point to its Observability Platform platform.
 
 **What is this app?**
 
-This app contains a set of ingresses used to access the Observability Platform API components. This app is made to be deployed by Giant Swarm close to the Observability Platform components to allow customer access to the platform components from outside their management clusters (e.g. self-hosted grafana, external logshipper)
+This app contains a set of ingresses to access the Observability Platform API components. This app is made to be deployed by Giant Swarm close to the Observability Platform components to allow customer access to the platform components from outside their management clusters (e.g. self-hosted Grafana, external log shipper)
 
 ## Installing
 
