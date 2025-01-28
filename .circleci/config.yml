@@ -45,7 +45,7 @@ workflows:
         app_namespace: monitoring
         app_collection_repo: capa-app-collection
         requires:
-        - push-logging-operator-to-app-catalog
+        - package-and-push-chart
         filters:
           branches:
             ignore: /.*/
@@ -59,7 +59,7 @@ workflows:
         app_namespace: monitoring
         app_collection_repo: capz-app-collection
         requires:
-        - push-logging-operator-to-app-catalog
+        - package-and-push-chart
         filters:
           branches:
             ignore: /.*/
@@ -73,7 +73,7 @@ workflows:
         app_namespace: monitoring
         app_collection_repo: cloud-director-app-collection
         requires:
-        - push-logging-operator-to-app-catalog
+        - package-and-push-chart
         filters:
           branches:
             ignore: /.*/
@@ -87,7 +87,7 @@ workflows:
         app_namespace: monitoring
         app_collection_repo: vsphere-app-collection
         requires:
-        - push-logging-operator-to-app-catalog
+        - package-and-push-chart
         filters:
           branches:
             ignore: /.*/
@@ -101,7 +101,7 @@ workflows:
         app_namespace: monitoring
         app_collection_repo: proxmox-app-collection
         requires:
-        - push-logging-operator-to-app-catalog
+        - package-and-push-chart
         filters:
           branches:
             ignore: /.*/
