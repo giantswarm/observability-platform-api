@@ -10,7 +10,7 @@ jobs:
     - checkout
     - run: |-
         cd helm/observability-platform-api
-        helm dep up
+        helm dependency update
         helm template .
 
 workflows:
