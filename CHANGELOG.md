@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- add ingress template
 - skaffolding of the application template
 
 [Unreleased]: https://github.com/giantswarm/observability-platform-api/tree/main

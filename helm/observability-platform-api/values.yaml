@@ -1,2 +1,22 @@
 name: observability-platform-api
 serviceType: managed
+
+ingresses:
+  - name: loki
+    namespace: loki
+    service:
+      name: loki-gateway
+      port: 80
+    ingressClassName: nginx
+    hosts:
+      - host: observability.giantswarm.io
+        paths: []
+  - name: mimir
+    namespace: mimir
+    service:
+      name: mimir-gateway
+      port: 80
+    ingressClassName: nginx
+    hosts:
+      - host: observability.giantswarm.io
+        paths: []
