@@ -1,17 +1,90 @@
 [![CircleCI](https://dl.circleci.com/status-badge/img/gh/giantswarm/observability-platform-api/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/giantswarm/observability-platform-api/tree/main)
 
+# observability-platform-api
 
-# Observability Platform API
+## Purpose
 
-Giant Swarm provides an Observability Platform API as the main entry point to its Observability Platform platform.
+The **observability-platform-api** provides the external access layer for Giant Swarm's Observability Platform, managing NGINX ingresses that enable secure access to observability services from external sources. This app handles all external routing, authentication, and access control for the platform's APIs.
 
-**What is this app?**
+### What this app is for:
 
-This app contains a set of ingresses to access the Observability Platform API components. This app is made to be deployed by Giant Swarm close to the Observability Platform components to allow customer access to the platform components from outside their management clusters (e.g. self-hosted Grafana, external log shipper)
+- **External API Access**: Secure HTTP/HTTPS endpoints for external systems to interact with observability services
+- **Authentication Gateway**: OIDC-based authentication and tenant routing for all external requests
+- **Multi-Service Routing**: Unified domain with path-based routing to different observability backends
+- **Access Control**: Enforcement of tenant isolation and security policies for external access
 
-## Installing
+## Place in Observability Platform
 
-There are several ways to install this app onto a workload cluster.
+The **observability-platform-api** serves as the external gateway of Giant Swarm's Observability Platform, working in tandem with the [alloy-gateway-app](https://github.com/giantswarm/alloy-gateway-app) to provide complete external access capabilities.
 
-- [Using GitOps to instantiate the App](https://docs.giantswarm.io/tutorials/continuous-deployment/apps/add-appcr/)
-- By creating an [App resource](https://docs.giantswarm.io/reference/platform-api/crd/apps.application.giantswarm.io) using the platform API as explained in [Getting started with App Platform](https://docs.giantswarm.io/tutorials/fleet-management/app-platform/).
+**Complete Platform Components:**
+
+- **observability-platform-api** (this repo) → External access control and routing
+- [**alloy-gateway-app**](https://github.com/giantswarm/alloy-gateway-app) → Data processing and forwarding for ingestion
+- **Loki, Mimir, Tempo** → Storage backends for logs, metrics, and traces
+
+All configuration is managed centrally through [shared-configs](https://github.com/giantswarm/shared-configs) templates, ensuring consistent deployment across all Giant Swarm installations.
+
+## Technical Implementation
+
+This repository contains the Helm chart and configuration templates for creating and managing NGINX ingresses that expose observability platform APIs to external users.
+
+## Technical Architecture
+
+### Ingress Management
+
+The observability-platform-api creates **5 separate ingresses** under a unified domain:
+
+```
+https://observability.<codename>.<base-domain>
+├── /loki/api/v1/push          → Gateway Ingress → alloy-gateway (port 3100)
+├── /v1/traces                 → Gateway OTLP    → alloy-gateway (port 4318) 
+├── /loki/api/v1/query*        → Loki Ingress    → loki-gateway (port 80)
+├── /prometheus/api/v1/*       → Mimir Ingress   → mimir-gateway (port 80)
+└── /tempo/api/*               → Tempo Ingress   → tempo-gateway (port 80)
+```
+
+## Architecture Notes
+
+### Multi-Ingress Design
+
+This app creates multiple ingresses rather than a single ingress because:
+
+**Benefits:**
+- **Granular Control**: Each service can have independent configuration and lifecycle
+- **Namespace Isolation**: Different backend services live in different namespaces
+- **Feature Flags**: Individual ingresses can be enabled/disabled based on cluster capabilities
+- **Security Boundaries**: Different authentication or access policies per service type
+
+**Operational Considerations:**
+
+- All ingresses share the same domain and authentication configuration
+- Consistent header validation and tenant isolation across all endpoints
+- Unified TLS certificate management for the shared domain
+
+## Configuration & Deployment
+
+**All configuration is managed through [shared-configs](https://github.com/giantswarm/shared-configs)** - this repository provides the base templates that are populated by the shared-configs system during deployment.
+
+- **Target Environment**: Management clusters only (not workload clusters)
+- **Deployment Method**: Automatically via Giant Swarm platform management
+- **Configuration Source**: Templates in this repo + values from shared-configs
+- **Feature Control**: Conditional ingress creation based on cluster capabilities
+
+## Documentation & Resources
+
+### User Documentation
+
+- [**Data Import/Export Guide**](https://docs.giantswarm.io/overview/observability/data-management/data-import-export/) - Public API documentation and usage examples
+- [**Intranet Documentation**](https://intranet.giantswarm.io/docs/observability/gateway/) - Internal operational guides
+
+### Related Repositories
+
+- [**alloy-gateway-app**](https://github.com/giantswarm/alloy-gateway-app) - Data ingestion gateway and processing
+- [**shared-configs**](https://github.com/giantswarm/shared-configs) - Central configuration management system
+
+### Project Information
+
+- [**Implementation Roadmap**](https://github.com/giantswarm/roadmap/issues/3568) - Original project scope and requirements
+- **Team**: Atlas (@giantswarm/team-atlas)
+- **Status**: Production deployment on management clusters
