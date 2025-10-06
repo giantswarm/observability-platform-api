@@ -33,15 +33,33 @@ This repository contains the Helm chart and configuration templates for creating
 
 ### Ingress Management
 
-The observability-platform-api creates **5 separate ingresses** under a unified domain:
+The observability-platform-api creates **6 separate ingresses** under a unified domain:
 
 ```
-https://observability.<codename>.<base-domain>
-├── /loki/api/v1/push          → Gateway Ingress → alloy-gateway (port 3100)
-├── /v1/traces                 → Gateway OTLP    → alloy-gateway (port 4318) 
-├── /loki/api/v1/query*        → Loki Ingress    → loki-gateway (port 80)
-├── /prometheus/api/v1/*       → Mimir Ingress   → mimir-gateway (port 80)
-└── /tempo/api/*               → Tempo Ingress   → tempo-gateway (port 80)
+┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                         Domain: https://observability.<codename>.<base-domain>                                │
+├─────────────┬──────────────────────────────────────────────────────────────┬──────────────────────────────────┤
+│ Protocol    │ Path                                                         │ Backend                          │
+├─────────────┼──────────────────────────────────────────────────────────────┼──────────────────────────────────┤
+│ HTTP (OTLP) │ /v1/traces                                                   │ observability-gateway-alloy:4318 │
+│ HTTP        │ /loki/api/v1/push                                            │ observability-gateway-alloy:3100 │
+│ HTTP        │ /loki/api/v1/*                                               │ loki-gateway:80                  │
+│             │ ├── /loki/api/v1/query                                       │                                  │
+│             │ ├── /loki/api/v1/labels                                      │                                  │
+│             │ └── ...                                                      │                                  │
+│ HTTP        │ /prometheus/api/v1/*                                         │ mimir-gateway:80                 │
+│             │ ├── /prometheus/api/v1/query                                 │                                  │
+│             │ ├── /prometheus/api/v1/labels                                │                                  │
+│             │ └── ...                                                      │                                  │
+│ HTTP        │ /tempo/api/*                                                 │ tempo-query-frontend:3200        │
+│             │ ├── /tempo/api/v2/search                                     │                                  │
+│             │ ├── /tempo/api/v2/traces                                     │                                  │
+│             │ └── ...                                                      │                                  │
+│ gRPC        │ /tempopb.*                                                   │ tempo-query-frontend:9095        │
+│             │ ├── /tempopb.StreamingQuerier.SearchTagsV2                   │                                  │
+│             │ ├── /tempopb.StreamingQuerier.MetricsQueryRange              │                                  │
+│             │ └── ...                                                      │                                  │
+└─────────────┴──────────────────────────────────────────────────────────────┴──────────────────────────────────┘
 ```
 
 ## Architecture Notes
