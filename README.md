@@ -55,7 +55,7 @@ The observability-platform-api creates **6 separate ingresses** under a unified 
 │             │ ├── /tempo/api/v2/search                                     │                                  │               │
 │             │ ├── /tempo/api/v2/traces                                     │                                  │               │
 │             │ └── ...                                                      │                                  │               │
-│ gRPC        │ /tempopb.*                                                   │ tempo-query-frontend:9095        │ Read/Write    │
+│ gRPC        │ /tempopb.*                                                   │ tempo-query-frontend:9095        │ Read          │
 │             │ ├── /tempopb.StreamingQuerier.SearchTagsV2                   │                                  │               │
 │             │ ├── /tempopb.StreamingQuerier.MetricsQueryRange              │                                  │               │
 │             │ └── ...                                                      │                                  │               │
