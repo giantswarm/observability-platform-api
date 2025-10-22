@@ -15,12 +15,11 @@ The **observability-platform-api** provides the external access layer for Giant 
 
 ## Place in Observability Platform
 
-The **observability-platform-api** serves as the external gateway of Giant Swarm's Observability Platform, working in tandem with the [alloy-gateway-app](https://github.com/giantswarm/alloy-gateway-app) to provide complete external access capabilities.
+The **observability-platform-api** serves as the external gateway of Giant Swarm's Observability Platform, providing direct access to observability services.
 
 **Complete Platform Components:**
 
 - **observability-platform-api** (this repo) → External access control and routing
-- [**alloy-gateway-app**](https://github.com/giantswarm/alloy-gateway-app) → Data processing and forwarding for ingestion
 - **Loki, Mimir, Tempo** → Storage backends for logs, metrics, and traces
 
 All configuration is managed centrally through [shared-configs](https://github.com/giantswarm/shared-configs) templates, ensuring consistent deployment across all Giant Swarm installations.
@@ -33,15 +32,14 @@ This repository contains the Helm chart and configuration templates for creating
 
 ### Ingress Management
 
-The observability-platform-api creates **5 separate ingresses** under a unified domain:
+The observability-platform-api creates separate ingresses under a unified domain for direct access to observability backends:
 
 ```
 https://observability.<codename>.<base-domain>
-├── /loki/api/v1/push          → Gateway Ingress → alloy-gateway (port 3100)
-├── /v1/traces                 → Gateway OTLP    → alloy-gateway (port 4318) 
-├── /loki/api/v1/query*        → Loki Ingress    → loki-gateway (port 80)
-├── /prometheus/api/v1/*       → Mimir Ingress   → mimir-gateway (port 80)
-└── /tempo/api/*               → Tempo Ingress   → tempo-gateway (port 80)
+├── /loki/api/v1/*             → Loki Ingress       → loki-gateway (port 80)
+├── /prometheus/api/v1/*       → Mimir Ingress      → mimir-gateway (port 80)
+├── /tempo/api/*               → Tempo Ingress      → tempo-query-frontend (port 80)
+└── /v1/traces                 → Traces (OTLP HTTP) → tempo-distributor (port 4318)
 ```
 
 ## Architecture Notes
@@ -80,7 +78,6 @@ This app creates multiple ingresses rather than a single ingress because:
 
 ### Related Repositories
 
-- [**alloy-gateway-app**](https://github.com/giantswarm/alloy-gateway-app) - Data ingestion gateway and processing
 - [**shared-configs**](https://github.com/giantswarm/shared-configs) - Central configuration management system
 
 ### Project Information

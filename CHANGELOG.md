@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Enable TLS secret sharing between ingresses with same host to avoid Let's Encrypt rate limiting
+
 ## [0.1.0] - 2025-01-29
 
 ### Added
