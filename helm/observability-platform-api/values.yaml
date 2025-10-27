@@ -23,6 +23,6 @@ ingresses:
     hosts:
       - host: observability.giantswarm.io
         paths: []
-    # Optional: use same secret name to share with loki ingress
+    # Optional: specify custom TLS secret name otherwise, the secret is shared in one namespace
     # tls:
     #   secretName: shared-observability-tls
