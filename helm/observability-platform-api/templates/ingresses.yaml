@@ -33,5 +33,5 @@ spec:
       {{- range $ingress.hosts }}
       - {{ tpl .host $ | quote }}
       {{- end }}
-      secretName: {{ include "resource.default.name" $ }}-{{ $ingress.name }}-tls
+      secretName: {{ include "ingress.tls.secretName" (dict "context" $ "ingress" $ingress) }}
 {{- end -}}

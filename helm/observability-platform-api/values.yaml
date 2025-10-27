@@ -11,6 +11,9 @@ ingresses:
     hosts:
       - host: observability.giantswarm.io
         paths: []
+    # Optional: specify custom TLS secret name otherwise, the secret is shared in one namespace
+    # tls:
+    #   secretName: shared-observability-tls
   - name: mimir
     namespace: mimir
     service:
@@ -20,3 +23,6 @@ ingresses:
     hosts:
       - host: observability.giantswarm.io
         paths: []
+    # Optional: specify custom TLS secret name otherwise, the secret is shared in one namespace
+    # tls:
+    #   secretName: shared-observability-tls
