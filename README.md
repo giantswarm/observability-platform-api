@@ -35,11 +35,31 @@ This repository contains the Helm chart and configuration templates for creating
 The observability-platform-api creates separate ingresses under a unified domain for direct access to observability backends:
 
 ```
-https://observability.<codename>.<base-domain>
-├── /loki/api/v1/*             → Loki Ingress       → loki-gateway (port 80)
-├── /prometheus/api/v1/*       → Mimir Ingress      → mimir-gateway (port 80)
-├── /tempo/api/*               → Tempo Ingress      → tempo-query-frontend (port 80)
-└── /v1/traces                 → Traces (OTLP HTTP) → tempo-distributor (port 4318)
+┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                              Domain: https://observability.<codename>.<base-domain>                                           │
+├─────────────┬──────────────────────────────────────────────────────────────┬──────────────────────────────────┬───────────────┤
+│ Protocol    │ Path                                                         │ Data type / backend              │ Type          │
+├─────────────┼──────────────────────────────────────────────────────────────┼──────────────────────────────────┼───────────────┤
+│ HTTPS       │ /loki/api/v1/*                                               │ Logs / Loki                      │ Read/Write    │
+│             │ ├── /loki/api/v1/push                                        │                                  │               │
+│             │ ├── /loki/api/v1/query                                       │                                  │               │
+│             │ ├── /loki/api/v1/labels                                      │                                  │               │
+│             │ └── ...                                                      │                                  │               │
+│ HTTPS       │ /prometheus/api/v1/*                                         │ Metrics / Mimir                  │ Read/Write    │
+│             │ ├── /prometheus/api/v1/push                                  │                                  │               │
+│             │ ├── /prometheus/api/v1/query                                 │                                  │               │
+│             │ ├── /prometheus/api/v1/labels                                │                                  │               │
+│             │ └── ...                                                      │                                  │               │
+│ HTTPS       │ /v1/traces                                                   │ OpenTelemetry Traces / Tempo     │ Write         │
+│ HTTPS       │ /tempo/api/*                                                 │ Traces / Tempo                   │ Read          │
+│             │ ├── /tempo/api/v2/search                                     │                                  │               │
+│             │ ├── /tempo/api/v2/traces                                     │                                  │               │
+│             │ └── ...                                                      │                                  │               │
+│ gRPC (+TLS) │ /tempopb.*                                                   │ Traces / Tempo                   │ Read          │
+│             │ ├── /tempopb.StreamingQuerier.SearchTagsV2                   │                                  │               │
+│             │ ├── /tempopb.StreamingQuerier.MetricsQueryRange              │                                  │               │
+│             │ └── ...                                                      │                                  │               │
+└─────────────┴──────────────────────────────────────────────────────────────┴──────────────────────────────────┴───────────────┘
 ```
 
 ## Architecture Notes
