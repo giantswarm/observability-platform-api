@@ -1,11 +1,11 @@
 version: 2.1
 orbs:
-  architect: giantswarm/architect@6.7.0
+  architect: giantswarm/architect@6.8.0
 
 jobs:
   template-chart:
     docker:
-    - image: giantswarm/helm-chart-testing:v3.13.0
+    - image: giantswarm/helm-chart-testing:v3.14.0
     steps:
     - checkout
     - run: |-
