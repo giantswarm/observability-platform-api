@@ -38,23 +38,24 @@ The observability-platform-api creates separate ingresses under a unified domain
 ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                              Domain: https://observability.<codename>.<base-domain>                                           │
 ├─────────────┬──────────────────────────────────────────────────────────────┬──────────────────────────────────┬───────────────┤
-│ Protocol    │ Path                                                         │ Backend                          │ Type          │
+│ Protocol    │ Path                                                         │ Data type / backend              │ Type          │
 ├─────────────┼──────────────────────────────────────────────────────────────┼──────────────────────────────────┼───────────────┤
-│ HTTP (OTLP) │ /v1/traces                                                   │ observability-gateway-alloy:4318 │ Write         │
-│ HTTP        │ /loki/api/v1/push                                            │ observability-gateway-alloy:3100 │ Write         │
-│ HTTP        │ /loki/api/v1/*                                               │ loki-gateway:80                  │ Read          │
+│ HTTPS       │ /loki/api/v1/*                                               │ Logs / Loki                      │ Read/Write    │
+│             │ ├── /loki/api/v1/push                                        │                                  │               │
 │             │ ├── /loki/api/v1/query                                       │                                  │               │
 │             │ ├── /loki/api/v1/labels                                      │                                  │               │
 │             │ └── ...                                                      │                                  │               │
-│ HTTP        │ /prometheus/api/v1/*                                         │ mimir-gateway:80                 │ Read          │
+│ HTTPS       │ /prometheus/api/v1/*                                         │ Metrics / Mimir                  │ Read/Write    │
+│             │ ├── /prometheus/api/v1/push                                  │                                  │               │
 │             │ ├── /prometheus/api/v1/query                                 │                                  │               │
 │             │ ├── /prometheus/api/v1/labels                                │                                  │               │
 │             │ └── ...                                                      │                                  │               │
-│ HTTP        │ /tempo/api/*                                                 │ tempo-query-frontend:3200        │ Read          │
+│ HTTPS       │ /v1/traces                                                   │ OpenTelemetry Traces / Tempo     │ Write         │
+│ HTTPS       │ /tempo/api/*                                                 │ Traces / Tempo                   │ Read          │
 │             │ ├── /tempo/api/v2/search                                     │                                  │               │
 │             │ ├── /tempo/api/v2/traces                                     │                                  │               │
 │             │ └── ...                                                      │                                  │               │
-│ gRPC        │ /tempopb.*                                                   │ tempo-query-frontend:9095        │ Read          │
+│ gRPC (+TLS) │ /tempopb.*                                                   │ Traces / Tempo                   │ Read          │
 │             │ ├── /tempopb.StreamingQuerier.SearchTagsV2                   │                                  │               │
 │             │ ├── /tempopb.StreamingQuerier.MetricsQueryRange              │                                  │               │
 │             │ └── ...                                                      │                                  │               │
