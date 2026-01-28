@@ -1,0 +1,280 @@
+{{- if .Values.mimir.enabled -}}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "resource.default.name" . }}-mimir-read-api
+  namespace: {{ .Values.mimir.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  {{- with .Values.mimir.parentRefs }}
+  parentRefs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.mimir.hostname }}
+  hostnames:
+  - {{ tpl . $ | quote }}
+  {{- end }}
+  rules:
+  - backendRefs:
+    - name: mimir-gateway
+      namespace: {{ .Values.mimir.namespace }}
+      port: 80
+    matches:
+    - path:
+        type: PathPrefix
+        value: /prometheus/api/v1/labels
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    - path:
+        type: PathPrefix
+        value: /prometheus/api/v1/label
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    - path:
+        type: PathPrefix
+        value: /prometheus/api/v1/rules
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    - path:
+        type: PathPrefix
+        value: /prometheus/api/v1/query
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    - path:
+        type: PathPrefix
+        value: /prometheus/api/v1/query_exemplars
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    - path:
+        type: PathPrefix
+        value: /prometheus/api/v1/query_range
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    - path:
+        type: PathPrefix
+        value: /prometheus/api/v1/status
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    - path:
+        type: PathPrefix
+        value: /prometheus/api/v1/metadata
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    - path:
+        type: PathPrefix
+        value: /prometheus/api/v1/detected_labels
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    filters:
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set:
+        - name: X-Scope-OrgID
+          value: "%REQ(X-Scope-OrgID)%"
+  - backendRefs:
+    - name: mimir-gateway
+      namespace: {{ .Values.mimir.namespace }}
+      port: 80
+    filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: {{ include "resource.default.name" . }}-mimir-read-api-headers-check
+    matches:
+    - path:
+        type: PathPrefix
+        value: /prometheus/api/v1/labels
+    - path:
+        type: PathPrefix
+        value: /prometheus/api/v1/label
+    - path:
+        type: PathPrefix
+        value: /prometheus/api/v1/rules
+    - path:
+        type: PathPrefix
+        value: /prometheus/api/v1/query
+    - path:
+        type: PathPrefix
+        value: /prometheus/api/v1/query_exemplars
+    - path:
+        type: PathPrefix
+        value: /prometheus/api/v1/query_range
+    - path:
+        type: PathPrefix
+        value: /prometheus/api/v1/status
+    - path:
+        type: PathPrefix
+        value: /prometheus/api/v1/metadata
+    - path:
+        type: PathPrefix
+        value: /prometheus/api/v1/detected_labels
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: {{ include "resource.default.name" . }}-mimir-read-api
+  namespace: {{ .Values.mimir.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ include "resource.default.name" . }}-mimir-read-api
+  extAuth:
+    http:
+      backendRefs:
+      - name: dex
+        namespace: giantswarm
+        port: 5556
+      path: /userinfo
+      headersToExtAuth:
+      - Authorization
+      - Cookie
+      - X-Scope-OrgID
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: HTTPRouteFilter
+metadata:
+  name: {{ include "resource.default.name" . }}-mimir-read-api-headers-check
+  namespace: {{ .Values.mimir.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  directResponse:
+    contentType: text/plain
+    statusCode: 400
+    body:
+      type: Inline
+      inline: "Bad Request"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "resource.default.name" . }}-mimir-write-api
+  namespace: {{ .Values.mimir.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  {{- with .Values.mimir.parentRefs }}
+  parentRefs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.mimir.hostname }}
+  hostnames:
+  - {{ tpl . $ | quote }}
+  {{- end }}
+  rules:
+  - backendRefs:
+    - name: mimir-gateway
+      namespace: {{ .Values.mimir.namespace }}
+      port: 80
+    matches:
+    - path:
+        type: RegularExpression
+        value: "^/prometheus(/api/v1/push)$"
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    filters:
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set:
+        - name: X-Scope-OrgID
+          value: "%REQ(X-Scope-OrgID)%"
+  - backendRefs:
+    - name: mimir-gateway
+      namespace: {{ .Values.mimir.namespace }}
+      port: 80
+    filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: {{ include "resource.default.name" . }}-mimir-write-api-rewrite
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: {{ include "resource.default.name" . }}-mimir-write-api-headers-check
+    matches:
+    - path:
+        type: RegularExpression
+        value: "^/prometheus(/api/v1/push)$"
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: {{ include "resource.default.name" . }}-mimir-write-api
+  namespace: {{ .Values.mimir.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ include "resource.default.name" . }}-mimir-write-api
+  extAuth:
+    http:
+      backendRefs:
+      - name: oauth2-proxy-observability-platform-api
+        namespace: monitoring
+        port: 4180
+      path: /oauth2/observability-platform-api/auth
+      headersToExtAuth:
+      - Authorization
+      - Cookie
+      - X-Scope-OrgID
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: HTTPRouteFilter
+metadata:
+  name: {{ include "resource.default.name" . }}-mimir-write-api-rewrite
+  namespace: {{ .Values.mimir.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  urlRewrite:
+    path:
+      type: ReplaceRegexMatch
+      replaceRegexMatch:
+        pattern: "^/prometheus(/.*)$"
+        substitution: "\\1"
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: HTTPRouteFilter
+metadata:
+  name: {{ include "resource.default.name" . }}-mimir-write-api-headers-check
+  namespace: {{ .Values.mimir.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  directResponse:
+    contentType: text/plain
+    statusCode: 400
+    body:
+      type: Inline
+      inline: "Bad Request"
+{{- end }}

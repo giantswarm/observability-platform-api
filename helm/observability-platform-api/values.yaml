@@ -1,6 +1,37 @@
 name: observability-platform-api
 serviceType: managed
 
+loki:
+  enabled: false
+  namespace: loki
+  # -- Hostname for all Loki routes. Supports Helm template strings.
+  hostname: ""
+  parentRefs:
+  - name: giantswarm-default
+    namespace: envoy-gateway-system
+
+mimir:
+  enabled: false
+  namespace: mimir
+  # -- Hostname for all Mimir routes. Supports Helm template strings.
+  hostname: ""
+  parentRefs:
+  - name: giantswarm-default
+    namespace: envoy-gateway-system
+
+tempo:
+  enabled: false
+  namespace: tempo
+  # -- Hostname for all Tempo routes. Supports Helm template strings.
+  hostname: ""
+  parentRefs:
+  - name: giantswarm-default
+    namespace: envoy-gateway-system
+
+gatewayAPI:
+  enabled: false
+  routes: []
+
 ingresses:
   - name: loki
     namespace: loki
