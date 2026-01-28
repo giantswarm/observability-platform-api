@@ -42,12 +42,6 @@ gatewayAPI:
           name: mimir-gateway
           port: 80
 
-      backendTrafficPolicy:
-        enabled: false
-        annotations: {}
-        labels: {}
-        requestBuffer:
-          limit: 50Mi
     loki:
       enabled: false
       # -- Set the route kind
@@ -85,13 +79,6 @@ gatewayAPI:
         service:
           name: loki-gateway
           port: 80
-
-      backendTrafficPolicy:
-        enabled: false
-        annotations: {}
-        labels: {}
-        requestBuffer:
-          limit: 50Mi
 
 ingresses:
   - name: loki
