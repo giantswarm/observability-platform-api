@@ -1,6 +1,98 @@
 name: observability-platform-api
 serviceType: managed
 
+gatewayAPI:
+  enabled: false
+  routes:
+    mimir:
+      enabled: false
+      # -- Set the route kind
+      # Valid options are GRPCRoute, HTTPRoute, TCPRoute, TLSRoute, UDPRoute
+      kind: HTTPRoute
+
+      annotations: {}
+      labels: {}
+
+      hostnames:
+      - observability.giantswarm.io
+
+      parentRefs: []
+
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
+
+      ## Filters define the filters that are applied to requests that match this rule.
+      filters: []
+
+      ## Additional custom rules that can be added to the route
+      additionalRules: []
+
+      securityPolicy:
+        enabled: false
+        annotations: {}
+        labels: {}
+        # basicAuth:
+        #   users:
+        #     name: <secret_name>
+      
+      backend:
+        service:
+          name: mimir-gateway
+          port: 80
+
+      backendTrafficPolicy:
+        enabled: false
+        annotations: {}
+        labels: {}
+        requestBuffer:
+          limit: 50Mi
+    loki:
+      enabled: false
+      # -- Set the route kind
+      # Valid options are GRPCRoute, HTTPRoute, TCPRoute, TLSRoute, UDPRoute
+      kind: HTTPRoute
+
+      annotations: {}
+      labels: {}
+
+      hostnames:
+      - observability.giantswarm.io
+      
+      parentRefs: []
+
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
+
+      ## Filters define the filters that are applied to requests that match this rule.
+      filters: []
+
+      ## Additional custom rules that can be added to the route
+      additionalRules: []
+
+      securityPolicy:
+        enabled: false
+        annotations: {}
+        labels: {}
+        # basicAuth:
+        #   users:
+        #     name: <secret_name>
+      
+      backend:
+        service:
+          name: loki-gateway
+          port: 80
+
+      backendTrafficPolicy:
+        enabled: false
+        annotations: {}
+        labels: {}
+        requestBuffer:
+          limit: 50Mi
+
 ingresses:
   - name: loki
     namespace: loki
