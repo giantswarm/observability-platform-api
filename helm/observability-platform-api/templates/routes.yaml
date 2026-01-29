@@ -36,16 +36,15 @@ spec:
       {{- with $route.filters }}
       filters:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- range $route.matches }}
-      {{- if and .urlRewrite.enabled (eq .path.value "/prometheus(/api/v1/push)") }}
-      filters:
+        {{- range $route.matches }}
+        {{- if and .urlRewrite.enabled (eq .path.value "/prometheus(/api/v1/push)") }}
         - type: ExtensionRef
           extensionRef:
             group: gateway.envoyproxy.io
             kind: HTTPRouteFilter
             name: {{ include "resource.default.name" $ }}-{{ $route.name }}-rewrite
-      {{- end }}
+        {{- end }}
+        {{- end }}
       {{- end }}
       {{- with $route.matches }}
       matches:
