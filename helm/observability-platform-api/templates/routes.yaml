@@ -1,6 +1,5 @@
 {{- if .Values.gatewayAPI.enabled -}}
 {{- range $route := .Values.gatewayAPI.routes }}
-  {{- if $route.enabled -}}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: {{ $route.kind | default "HTTPRoute" }}
@@ -112,7 +111,6 @@ spec:
       replaceRegexMatch:
         pattern: {{ $match.urlRewrite.pattern | quote }}
         substitution: {{ $match.urlRewrite.substitution | quote }}
-{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

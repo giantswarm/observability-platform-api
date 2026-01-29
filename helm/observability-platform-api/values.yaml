@@ -5,7 +5,6 @@ gatewayAPI:
   enabled: false
   routes:
   - mimir:
-      enabled: false
       # -- Set the route kind
       # Valid options are GRPCRoute, HTTPRoute, TCPRoute, TLSRoute, UDPRoute
       kind: HTTPRoute
@@ -53,7 +52,6 @@ gatewayAPI:
           port: 80
 
   - loki:
-      enabled: false
       # -- Set the route kind
       # Valid options are GRPCRoute, HTTPRoute, TCPRoute, TLSRoute, UDPRoute
       kind: HTTPRoute
