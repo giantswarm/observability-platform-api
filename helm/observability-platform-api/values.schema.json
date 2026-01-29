@@ -36,28 +36,6 @@
                                         }
                                     }
                                 },
-                                "backendTrafficPolicy": {
-                                    "type": "object",
-                                    "properties": {
-                                        "annotations": {
-                                            "type": "object"
-                                        },
-                                        "enabled": {
-                                            "type": "boolean"
-                                        },
-                                        "labels": {
-                                            "type": "object"
-                                        },
-                                        "requestBuffer": {
-                                            "type": "object",
-                                            "properties": {
-                                                "limit": {
-                                                    "type": "string"
-                                                }
-                                            }
-                                        }
-                                    }
-                                },
                                 "enabled": {
                                     "type": "boolean"
                                 },
@@ -139,28 +117,6 @@
                                         }
                                     }
                                 },
-                                "backendTrafficPolicy": {
-                                    "type": "object",
-                                    "properties": {
-                                        "annotations": {
-                                            "type": "object"
-                                        },
-                                        "enabled": {
-                                            "type": "boolean"
-                                        },
-                                        "labels": {
-                                            "type": "object"
-                                        },
-                                        "requestBuffer": {
-                                            "type": "object",
-                                            "properties": {
-                                                "limit": {
-                                                    "type": "string"
-                                                }
-                                            }
-                                        }
-                                    }
-                                },
                                 "enabled": {
                                     "type": "boolean"
                                 },
@@ -191,6 +147,20 @@
                                                         "type": "string"
                                                     },
                                                     "value": {
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            },
+                                            "urlRewrite": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "enabled": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "pattern": {
+                                                        "type": "string"
+                                                    },
+                                                    "substitution": {
                                                         "type": "string"
                                                     }
                                                 }

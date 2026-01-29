@@ -22,6 +22,10 @@ gatewayAPI:
         - path:
             type: PathPrefix
             value: /
+          urlRewrite:
+            enabled: false
+            pattern: "^/prometheus(/.*)$"
+            substitution: "\\1"
 
       ## Filters define the filters that are applied to requests that match this rule.
       filters: []
@@ -33,9 +37,12 @@ gatewayAPI:
         enabled: false
         annotations: {}
         labels: {}
-        # basicAuth:
-        #   users:
-        #     name: <secret_name>
+        # extAuth:
+        #   http:
+        #     backendRefs:
+        #       - name: oauth2-proxy-observability-platform-api
+        #         port: 4180
+        #     headersToBackend: ["X-Scope-OrgID"]
       
       backend:
         service:
@@ -71,9 +78,12 @@ gatewayAPI:
         enabled: false
         annotations: {}
         labels: {}
-        # basicAuth:
-        #   users:
-        #     name: <secret_name>
+        # extAuth:
+        #   http:
+        #     backendRefs:
+        #       - name: oauth2-proxy-observability-platform-api
+        #         port: 4180
+        #     headersToBackend: ["X-Scope-OrgID"]
       
       backend:
         service:

@@ -5,7 +5,7 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: {{ $route.kind | default "HTTPRoute" }}
 metadata:
-  name: {{ include "mimir.resourceName" (dict "ctx" $ "component" "gateway") }}{{ if ne $name "main" }}-{{ $name }}{{ end }}
+  name: {{ include "resource.default.name" $ }}-{{ $route.name }}
   namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "labels.common" $ | nindent 4 }}
@@ -37,6 +37,16 @@ spec:
       filters:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- range $route.matches }}
+      {{- if and .urlRewrite.enabled (eq .path.value "/prometheus(/api/v1/push)") }}
+      filters:
+        - type: ExtensionRef
+          extensionRef:
+            group: gateway.envoyproxy.io
+            kind: HTTPRouteFilter
+            name: {{ include "resource.default.name" $ }}-{{ $route.name }}-rewrite
+      {{- end }}
+      {{- end }}
       {{- with $route.matches }}
       matches:
         {{- toYaml . | nindent 8 }}
@@ -47,7 +57,7 @@ spec:
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata:
-  name: {{ $route.name | default (include "mimir.resourceName" (dict "ctx" $ "component" "gateway") ) }}
+  name: {{ include "resource.default.name" $ }}-{{ $route.name }}
   labels:
     {{- include "labels.common" $ | nindent 4 }}
     {{- with $policy.labels }}
@@ -86,6 +96,25 @@ spec:
   authorization:
     {{- toYaml . | nindent 4 }}
   {{ end }}
+{{- range $match := $route.matches }}
+{{- if and $route.enabled $match.urlRewrite.enabled }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: HTTPRouteFilter
+metadata:
+ labels:
+    {{- include "labels.common" $ | nindent 4 }}
+  name: {{ include "resource.default.name" $ }}-{{ $route.name }}-rewrite
+  namespace: {{ $.Release.Namespace }}
+spec:
+  urlRewrite:
+    path:
+      type: ReplaceRegexMatch
+      replaceRegexMatch:
+        pattern: {{ $match.urlRewrite.pattern | quote }}
+        substitution: {{ $match.urlRewrite.substitution | quote }}
+{{- end }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
