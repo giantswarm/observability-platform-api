@@ -43,7 +43,7 @@ gatewayAPI:
         #       - name: oauth2-proxy-observability-platform-api
         #         port: 4180
         #     headersToBackend: ["X-Scope-OrgID"]
-      
+
       backend:
         service:
           name: mimir-gateway
@@ -60,7 +60,7 @@ gatewayAPI:
 
       hostnames:
       - observability.giantswarm.io
-      
+
       parentRefs: []
 
       matches:
@@ -84,7 +84,7 @@ gatewayAPI:
         #       - name: oauth2-proxy-observability-platform-api
         #         port: 4180
         #     headersToBackend: ["X-Scope-OrgID"]
-      
+
       backend:
         service:
           name: loki-gateway
