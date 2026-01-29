@@ -4,11 +4,14 @@ serviceType: managed
 gatewayAPI:
   enabled: false
   routes:
-    mimir:
+  - mimir:
       enabled: false
       # -- Set the route kind
       # Valid options are GRPCRoute, HTTPRoute, TCPRoute, TLSRoute, UDPRoute
       kind: HTTPRoute
+
+      name: mimir
+      namespace: mimir
 
       annotations: {}
       labels: {}
@@ -49,7 +52,7 @@ gatewayAPI:
           name: mimir-gateway
           port: 80
 
-    loki:
+  - loki:
       enabled: false
       # -- Set the route kind
       # Valid options are GRPCRoute, HTTPRoute, TCPRoute, TLSRoute, UDPRoute
@@ -57,6 +60,9 @@ gatewayAPI:
 
       annotations: {}
       labels: {}
+
+      name: loki
+      namespace: loki
 
       hostnames:
       - observability.giantswarm.io
