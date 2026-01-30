@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-
+- Build with up-to-date pipelines.
 - Enable TLS secret configuration for the ingresses. The default now changes to having a single shared secret per host in one namespace to avoid Let's Encrypt rate limiting
 
 ## [0.1.0] - 2025-01-29
