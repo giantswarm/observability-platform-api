@@ -45,6 +45,17 @@ gatewayAPI:
       #         port: 4180
       #     headersToBackend: ["X-Scope-OrgID"]
 
+    httpRouteFilter:
+      enabled: false
+      annotations: {}
+      labels: {}
+      urlRewrite:
+        path:
+          type: ReplaceRegexMatch
+          replaceRegexMatch:
+            pattern: "^/prometheus(/.*)$"
+            substitution: "\\1"
+
     backend:
       service:
         name: mimir-gateway

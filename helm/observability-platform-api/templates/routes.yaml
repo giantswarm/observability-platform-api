@@ -35,15 +35,6 @@ spec:
       {{- with $route.filters }}
       filters:
         {{- toYaml . | nindent 8 }}
-        {{- range $route.matches }}
-        {{- if and .urlRewrite.enabled (eq .path.value "/prometheus(/api/v1/push)") }}
-        - type: ExtensionRef
-          extensionRef:
-            group: gateway.envoyproxy.io
-            kind: HTTPRouteFilter
-            name: {{ include "resource.default.name" $ }}-{{ $route.name }}-rewrite
-        {{- end }}
-        {{- end }}
       {{- end }}
       {{- with $route.matches }}
       matches:
@@ -95,8 +86,8 @@ spec:
   authorization:
     {{- toYaml . | nindent 4 }}
   {{ end }}
-{{- range $match := $route.matches }}
-{{- if $match.urlRewrite.enabled }}
+{{- if $route.httpRouteFilter.enabled }}
+{{ $filter := $route.httpRouteFilter }}
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: HTTPRouteFilter
@@ -106,13 +97,10 @@ metadata:
   name: {{ include "resource.default.name" $ }}-{{ $route.name }}-rewrite
   namespace: {{ $route.namespace }}
 spec:
+  {{- with $filter.urlRewrite }}
   urlRewrite:
-    path:
-      type: ReplaceRegexMatch
-      replaceRegexMatch:
-        pattern: {{ $match.urlRewrite.pattern | quote }}
-        substitution: {{ $match.urlRewrite.substitution | quote }}
-{{- end }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
