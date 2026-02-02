@@ -2,7 +2,7 @@ name: observability-platform-api
 serviceType: managed
 
 gatewayAPI:
-  enabled: true
+  enabled: false
   routes:
   - name: mimir
     namespace: mimir
