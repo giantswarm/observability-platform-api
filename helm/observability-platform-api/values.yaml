@@ -2,97 +2,95 @@ name: observability-platform-api
 serviceType: managed
 
 gatewayAPI:
-  enabled: false
+  enabled: true
   routes:
-  - mimir:
-      # -- Set the route kind
-      # Valid options are GRPCRoute, HTTPRoute, TCPRoute, TLSRoute, UDPRoute
-      kind: HTTPRoute
+  - name: mimir
+    namespace: mimir
 
-      name: mimir
-      namespace: mimir
+    # -- Set the route kind
+    # Valid options are GRPCRoute, HTTPRoute, TCPRoute, TLSRoute, UDPRoute
+    kind: HTTPRoute
 
+    annotations: {}
+    labels: {}
+
+    hostnames:
+    - observability.giantswarm.io
+
+    parentRefs: []
+
+    matches:
+      - path:
+          type: PathPrefix
+          value: /
+        urlRewrite:
+          enabled: false
+          pattern: "^/prometheus(/.*)$"
+          substitution: "\\1"
+
+    ## Filters define the filters that are applied to requests that match this rule.
+    filters: []
+
+    ## Additional custom rules that can be added to the route
+    additionalRules: []
+
+    securityPolicy:
+      enabled: false
       annotations: {}
       labels: {}
+      # extAuth:
+      #   http:
+      #     backendRefs:
+      #       - name: oauth2-proxy-observability-platform-api
+      #         port: 4180
+      #     headersToBackend: ["X-Scope-OrgID"]
 
-      hostnames:
-      - observability.giantswarm.io
+    backend:
+      service:
+        name: mimir-gateway
+        port: 80
 
-      parentRefs: []
+  - name: loki
+    namespace: loki
 
-      matches:
-        - path:
-            type: PathPrefix
-            value: /
-          urlRewrite:
-            enabled: false
-            pattern: "^/prometheus(/.*)$"
-            substitution: "\\1"
+    # -- Set the route kind
+    # Valid options are GRPCRoute, HTTPRoute, TCPRoute, TLSRoute, UDPRoute
+    kind: HTTPRoute
 
-      ## Filters define the filters that are applied to requests that match this rule.
-      filters: []
+    annotations: {}
+    labels: {}
 
-      ## Additional custom rules that can be added to the route
-      additionalRules: []
+    hostnames:
+    - observability.giantswarm.io
 
-      securityPolicy:
-        enabled: false
-        annotations: {}
-        labels: {}
-        # extAuth:
-        #   http:
-        #     backendRefs:
-        #       - name: oauth2-proxy-observability-platform-api
-        #         port: 4180
-        #     headersToBackend: ["X-Scope-OrgID"]
+    parentRefs: []
 
-      backend:
-        service:
-          name: mimir-gateway
-          port: 80
+    matches:
+      - path:
+          type: PathPrefix
+          value: /
 
-  - loki:
-      # -- Set the route kind
-      # Valid options are GRPCRoute, HTTPRoute, TCPRoute, TLSRoute, UDPRoute
-      kind: HTTPRoute
+    ## Filters define the filters that are applied to requests that match this rule.
+    filters: []
 
+    ## Additional custom rules that can be added to the route
+    additionalRules: []
+
+    securityPolicy:
+      enabled: false
       annotations: {}
       labels: {}
+      # extAuth:
+      #   http:
+      #     backendRefs:
+      #       - name: oauth2-proxy-observability-platform-api
+      #         port: 4180
+      #     headersToBackend: ["X-Scope-OrgID"]
 
-      name: loki
-      namespace: loki
-
-      hostnames:
-      - observability.giantswarm.io
-
-      parentRefs: []
-
-      matches:
-        - path:
-            type: PathPrefix
-            value: /
-
-      ## Filters define the filters that are applied to requests that match this rule.
-      filters: []
-
-      ## Additional custom rules that can be added to the route
-      additionalRules: []
-
-      securityPolicy:
-        enabled: false
-        annotations: {}
-        labels: {}
-        # extAuth:
-        #   http:
-        #     backendRefs:
-        #       - name: oauth2-proxy-observability-platform-api
-        #         port: 4180
-        #     headersToBackend: ["X-Scope-OrgID"]
-
-      backend:
-        service:
-          name: loki-gateway
-          port: 80
+    backend:
+      service:
+        name: loki-gateway
+        port: 80
 
 ingresses:
   - name: loki
