@@ -87,20 +87,25 @@ spec:
     {{- toYaml . | nindent 4 }}
   {{ end }}
 {{- if $route.httpRouteFilter.enabled }}
-{{ $filter := $route.httpRouteFilter }}
+{{ range $filter := $route.httpRouteFilter.filters }}
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: HTTPRouteFilter
 metadata:
   labels:
     {{- include "labels.common" $ | nindent 4 }}
-  name: {{ include "resource.default.name" $ }}-{{ $route.name }}-rewrite
+  name: {{ include "resource.default.name" $ }}-{{ $route.name }}-{{ $filter.name }}
   namespace: {{ $route.namespace }}
 spec:
   {{- with $filter.urlRewrite }}
   urlRewrite:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with $filter.directResponse }}
+  directResponse:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

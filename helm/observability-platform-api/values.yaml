@@ -43,14 +43,25 @@ gatewayAPI:
 
     httpRouteFilter:
       enabled: false
-      annotations: {}
-      labels: {}
-      urlRewrite:
-        path:
-          type: ReplaceRegexMatch
-          replaceRegexMatch:
-            pattern: "^/prometheus(/.*)$"
-            substitution: "\\1"
+      filters:
+      - name: url-rewrite
+        annotations: {}
+        labels: {}
+        urlRewrite:
+          path:
+            type: ReplaceRegexMatch
+            replaceRegexMatch:
+              pattern: "^/prometheus(/.*)$"
+              substitution: "\\1"
+      - name: check-headers
+        annotations: {}
+        labels: {}
+        directResponse:
+          contentType: text/plain
+          statusCode: 400
+          body:
+            type: Inline
+            inline: "Bad Request"
 
     backend:
       service:
@@ -97,8 +108,16 @@ gatewayAPI:
 
     httpRouteFilter:
       enabled: false
-      annotations: {}
-      labels: {}
+      filters:
+      - name: check-headers
+        annotations: {}
+        labels: {}
+        directResponse:
+          contentType: text/plain
+          statusCode: 400
+          body:
+            type: Inline
+            inline: "Bad Request"
 
     backend:
       service:

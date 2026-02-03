@@ -50,34 +50,45 @@
                             "httpRouteFilter": {
                                 "type": "object",
                                 "properties": {
-                                    "annotations": {
-                                        "type": "object"
-                                    },
                                     "enabled": {
                                         "type": "boolean"
                                     },
-                                    "labels": {
-                                        "type": "object"
-                                    },
-                                    "urlRewrite": {
-                                        "type": "object",
-                                        "properties": {
-                                            "path": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "replaceRegexMatch": {
-                                                        "type": "object",
-                                                        "properties": {
-                                                            "pattern": {
-                                                                "type": "string"
-                                                            },
-                                                            "substitution": {
-                                                                "type": "string"
+                                    "filters": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "annotations": {
+                                                    "type": "object"
+                                                },
+                                                "labels": {
+                                                    "type": "object"
+                                                },
+                                                "name": {
+                                                    "type": "string"
+                                                },
+                                                "urlRewrite": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "path": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "replaceRegexMatch": {
+                                                                    "type": "object",
+                                                                    "properties": {
+                                                                        "pattern": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "substitution": {
+                                                                            "type": "string"
+                                                                        }
+                                                                    }
+                                                                },
+                                                                "type": {
+                                                                    "type": "string"
+                                                                }
                                                             }
                                                         }
-                                                    },
-                                                    "type": {
-                                                        "type": "string"
                                                     }
                                                 }
                                             }
