@@ -1,0 +1,112 @@
+{{- if .Values.gatewayAPI.enabled -}}
+{{- range $route := .Values.gatewayAPI.routes }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: {{ $route.kind | default "HTTPRoute" }}
+metadata:
+  name: {{ include "resource.default.name" $ }}-{{ $route.name }}
+  namespace: {{ $route.namespace }}
+  labels:
+    {{- include "labels.common" $ | nindent 4 }}
+    {{- with $route.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with $route.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with $route.parentRefs }}
+  parentRefs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $route.hostnames }}
+  hostnames:
+    {{- tpl (toYaml .) $ | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- if $route.additionalRules }}
+    {{- tpl (toYaml $route.additionalRules) $ | nindent 4 }}
+    {{- end }}
+    - backendRefs:
+        - name: {{ $route.backend.service.name }}
+          namespace: {{ $route.backend.service.namespace }}
+          port: {{ $route.backend.service.port }}
+      {{- with $route.filters }}
+      filters:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $route.matches }}
+      matches:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- if $route.securityPolicy.enabled }}
+{{- $policy := $route.securityPolicy }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: {{ include "resource.default.name" $ }}-{{ $route.name }}
+  namespace: {{ $route.namespace }}
+  labels:
+    {{- include "labels.common" $ | nindent 4 }}
+    {{- with $policy.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with $policy.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: {{ $route.kind | default "HTTPRoute" }}
+      name: {{ include "resource.default.name" $ }}-{{ $route.name }}
+  {{ with $policy.basicAuth }}
+  basicAuth:
+    {{- toYaml . | nindent 4 }}
+  {{ end }}
+  {{ with $policy.cors }}
+  cors:
+    {{- toYaml . | nindent 4 }}
+  {{ end }}
+  {{ with $policy.jwt }}
+  jwt:
+    {{- toYaml . | nindent 4 }}
+  {{ end }}
+  {{ with $policy.oidc }}
+  oidc:
+    {{- toYaml . | nindent 4 }}
+  {{ end }}
+  {{ with $policy.extAuth }}
+  extAuth:
+    {{- toYaml . | nindent 4 }}
+  {{ end }}
+  {{ with $policy.authorization }}
+  authorization:
+    {{- toYaml . | nindent 4 }}
+  {{ end }}
+{{- if $route.httpRouteFilter.enabled }}
+{{ range $filter := $route.httpRouteFilter.filters }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: HTTPRouteFilter
+metadata:
+  labels:
+    {{- include "labels.common" $ | nindent 4 }}
+  name: {{ include "resource.default.name" $ }}-{{ $route.name }}-{{ $filter.name }}
+  namespace: {{ $route.namespace }}
+spec:
+  {{- with $filter.urlRewrite }}
+  urlRewrite:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $filter.directResponse }}
+  directResponse:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
