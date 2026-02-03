@@ -55,6 +55,7 @@ gatewayAPI:
     backend:
       service:
         name: mimir-gateway
+        namespace: mimir
         port: 80
 
   - name: loki
@@ -102,6 +103,7 @@ gatewayAPI:
     backend:
       service:
         name: loki-gateway
+        namespace: loki
         port: 80
 
 ingresses:

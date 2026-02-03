@@ -28,6 +28,9 @@
                                             "name": {
                                                 "type": "string"
                                             },
+                                            "namespace": {
+                                                "type": "string"
+                                            },
                                             "port": {
                                                 "type": "integer"
                                             }
@@ -100,20 +103,6 @@
                                                     "type": "string"
                                                 },
                                                 "value": {
-                                                    "type": "string"
-                                                }
-                                            }
-                                        },
-                                        "urlRewrite": {
-                                            "type": "object",
-                                            "properties": {
-                                                "enabled": {
-                                                    "type": "boolean"
-                                                },
-                                                "pattern": {
-                                                    "type": "string"
-                                                },
-                                                "substitution": {
                                                     "type": "string"
                                                 }
                                             }

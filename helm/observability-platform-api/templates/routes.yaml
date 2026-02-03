@@ -30,7 +30,7 @@ spec:
     {{- end }}
     - backendRefs:
         - name: {{ $route.backend.service.name }}
-          {{- /* port: {{ $.Values.mimir.gateway.service.port }} */}}
+          namespace: {{ $route.backend.service.namespace }}
           port: {{ $route.backend.service.port }}
       {{- with $route.filters }}
       filters:
