@@ -10,7 +10,6 @@ loki:
   - name: giantswarm-default
     namespace: envoy-gateway-system
 
-
 mimir:
   enabled: false
   namespace: mimir
@@ -20,7 +19,6 @@ mimir:
   - name: giantswarm-default
     namespace: envoy-gateway-system
 
-
 tempo:
   enabled: false
   namespace: tempo
@@ -29,8 +27,6 @@ tempo:
   parentRefs:
   - name: giantswarm-default
     namespace: envoy-gateway-system
-
-
 
 ingresses:
   - name: loki
