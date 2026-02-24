@@ -1,0 +1,91 @@
+{{- if .Values.tempo.enabled -}}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo-otlp-write-api
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  {{- with .Values.tempo.parentRefs }}
+  parentRefs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.tempo.hostname }}
+  hostnames:
+  - {{ tpl . $ | quote }}
+  {{- end }}
+  rules:
+  - backendRefs:
+    - name: tempo-distributor
+      namespace: {{ .Values.tempo.namespace }}
+      port: 4318
+    matches:
+    - path:
+        type: PathPrefix
+        value: /v1/traces
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    filters:
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set:
+        - name: X-Scope-OrgID
+          value: "%REQ(X-Scope-OrgID)%"
+  - backendRefs:
+    - name: tempo-distributor
+      namespace: {{ .Values.tempo.namespace }}
+      port: 4318
+    filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: {{ include "resource.default.name" . }}-tempo-otlp-write-api-headers-check
+    matches:
+    - path:
+        type: PathPrefix
+        value: /v1/traces
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo-otlp-write-api
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ include "resource.default.name" . }}-tempo-otlp-write-api
+  extAuth:
+    http:
+      backendRefs:
+      - name: dex
+        namespace: giantswarm
+        port: 5556
+      path: /userinfo
+      headersToExtAuth:
+      - Authorization
+      - Cookie
+      - X-Scope-OrgID
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: HTTPRouteFilter
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo-otlp-write-api-headers-check
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  directResponse:
+    contentType: text/plain
+    statusCode: 400
+    body:
+      type: Inline
+      inline: "Bad Request"
+{{- end }}
