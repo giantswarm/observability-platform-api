@@ -17,14 +17,6 @@
                 "parentRefs": {
                     "type": "array"
                 },
-                "routes": {
-                    "type": "object",
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean"
-                        }
-                    }
-                }
             }
         },
         "mimir": {
@@ -42,14 +34,6 @@
                 "parentRefs": {
                     "type": "array"
                 },
-                "routes": {
-                    "type": "object",
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean"
-                        }
-                    }
-                }
             }
         },
         "tempo": {
@@ -67,14 +51,6 @@
                 "parentRefs": {
                     "type": "array"
                 },
-                "routes": {
-                    "type": "object",
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean"
-                        }
-                    }
-                }
             }
         },
 "ingresses": {
