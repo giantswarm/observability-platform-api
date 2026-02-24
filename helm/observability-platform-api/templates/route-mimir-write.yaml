@@ -23,8 +23,8 @@ spec:
       port: 80
     matches:
     - path:
-        type: RegularExpression
-        value: "^/prometheus(/api/v1/push)$"
+        type: PathPrefix
+        value: /prometheus/api/v1/push
       headers:
       - name: X-Scope-OrgID
         value: "^.+$"
@@ -57,8 +57,8 @@ spec:
         name: {{ include "resource.default.name" . }}-mimir-write-api-headers-check
     matches:
     - path:
-        type: RegularExpression
-        value: "^/prometheus(/api/v1/push)$"
+        type: PathPrefix
+        value: /prometheus/api/v1/push
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy

@@ -23,50 +23,50 @@ spec:
       port: 3200
     matches:
     - path:
-        type: RegularExpression
-        value: "^/tempo(/api/echo)$"
+        type: PathPrefix
+        value: /tempo/api/echo
       headers:
       - name: X-Scope-OrgID
         value: "^.+$"
         type: RegularExpression
     - path:
-        type: RegularExpression
-        value: "^/tempo(/api/status/buildinfo)$"
+        type: PathPrefix
+        value: /tempo/api/status/buildinfo
       headers:
       - name: X-Scope-OrgID
         value: "^.+$"
         type: RegularExpression
     - path:
-        type: RegularExpression
-        value: "^/tempo(/api/metrics/query_range)$"
+        type: PathPrefix
+        value: /tempo/api/metrics/query_range
       headers:
       - name: X-Scope-OrgID
         value: "^.+$"
         type: RegularExpression
     - path:
-        type: RegularExpression
-        value: "^/tempo(/api/search)$"
+        type: PathPrefix
+        value: /tempo/api/search
       headers:
       - name: X-Scope-OrgID
         value: "^.+$"
         type: RegularExpression
     - path:
-        type: RegularExpression
-        value: "^/tempo(/api/v2/search)$"
+        type: PathPrefix
+        value: /tempo/api/v2/search
       headers:
       - name: X-Scope-OrgID
         value: "^.+$"
         type: RegularExpression
     - path:
-        type: RegularExpression
-        value: "^/tempo(/api/traces)$"
+        type: PathPrefix
+        value: /tempo/api/traces
       headers:
       - name: X-Scope-OrgID
         value: "^.+$"
         type: RegularExpression
     - path:
-        type: RegularExpression
-        value: "^/tempo(/api/v2/traces)$"
+        type: PathPrefix
+        value: /tempo/api/v2/traces
       headers:
       - name: X-Scope-OrgID
         value: "^.+$"
@@ -94,26 +94,26 @@ spec:
         name: {{ include "resource.default.name" . }}-tempo-read-api-headers-check
     matches:
     - path:
-        type: RegularExpression
-        value: "^/tempo(/api/echo)$"
+        type: PathPrefix
+        value: /tempo/api/echo
     - path:
-        type: RegularExpression
-        value: "^/tempo(/api/status/buildinfo)$"
+        type: PathPrefix
+        value: /tempo/api/status/buildinfo
     - path:
-        type: RegularExpression
-        value: "^/tempo(/api/metrics/query_range)$"
+        type: PathPrefix
+        value: /tempo/api/metrics/query_range
     - path:
-        type: RegularExpression
-        value: "^/tempo(/api/search)$"
+        type: PathPrefix
+        value: /tempo/api/search
     - path:
-        type: RegularExpression
-        value: "^/tempo(/api/v2/search)$"
+        type: PathPrefix
+        value: /tempo/api/v2/search
     - path:
-        type: RegularExpression
-        value: "^/tempo(/api/traces)$"
+        type: PathPrefix
+        value: /tempo/api/traces
     - path:
-        type: RegularExpression
-        value: "^/tempo(/api/v2/traces)$"
+        type: PathPrefix
+        value: /tempo/api/v2/traces
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
