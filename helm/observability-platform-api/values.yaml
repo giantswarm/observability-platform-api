@@ -34,9 +34,6 @@ tempo:
   routes:
     enabled: true
 
-gatewayAPI:
-  enabled: false
-  routes: []
 
 ingresses:
   - name: loki
