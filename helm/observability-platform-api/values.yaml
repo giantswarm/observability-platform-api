@@ -9,6 +9,8 @@ loki:
   parentRefs:
   - name: giantswarm-default
     namespace: envoy-gateway-system
+  routes:
+    enabled: true
 
 mimir:
   enabled: false
@@ -18,6 +20,8 @@ mimir:
   parentRefs:
   - name: giantswarm-default
     namespace: envoy-gateway-system
+  routes:
+    enabled: true
 
 tempo:
   enabled: false
@@ -27,6 +31,8 @@ tempo:
   parentRefs:
   - name: giantswarm-default
     namespace: envoy-gateway-system
+  routes:
+    enabled: true
 
 gatewayAPI:
   enabled: false

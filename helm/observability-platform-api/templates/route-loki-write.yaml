@@ -1,4 +1,4 @@
-{{- if .Values.loki.enabled -}}
+{{- if and .Values.loki.enabled .Values.loki.routes.enabled -}}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

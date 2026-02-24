@@ -1,4 +1,4 @@
-{{- if .Values.mimir.enabled -}}
+{{- if and .Values.mimir.enabled .Values.mimir.routes.enabled -}}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
