@@ -30,6 +30,11 @@ spec:
         value: "^.+$"
         type: RegularExpression
     filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: {{ include "resource.default.name" . }}-mimir-write-api-rewrite
     - type: ResponseHeaderModifier
       responseHeaderModifier:
         set:
