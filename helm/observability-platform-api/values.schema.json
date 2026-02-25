@@ -16,7 +16,7 @@
                 },
                 "parentRefs": {
                     "type": "array"
-                },
+                }
             }
         },
         "mimir": {
@@ -33,7 +33,7 @@
                 },
                 "parentRefs": {
                     "type": "array"
-                },
+                }
             }
         },
         "tempo": {
@@ -50,10 +50,10 @@
                 },
                 "parentRefs": {
                     "type": "array"
-                },
+                }
             }
         },
-"ingresses": {
+        "ingresses": {
             "type": "array",
             "items": {
                 "type": "object",
