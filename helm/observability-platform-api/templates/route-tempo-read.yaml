@@ -23,7 +23,7 @@ Resources (gRPC):
   - SecurityPolicy: enforces JWT validation using auth.jwt.providers.
 
 Exposed gRPC path:
-  any service matching regex "tempopb"  (e.g. tempopb.StreamingQuerier, tempopb.Querier)
+  any service matching regex "tempopb\.[^/]+"  (e.g. tempopb.StreamingQuerier, tempopb.Querier)
 */}}
 {{- if and .Values.tempo.enabled .Values.auth.jwt.providers -}}
 ---
@@ -211,7 +211,7 @@ spec:
       port: 9095
     matches:
     - method:
-        service: tempopb
+        service: "tempopb\\.[^/]+"
         type: RegularExpression
       headers:
       - name: X-Scope-OrgID
