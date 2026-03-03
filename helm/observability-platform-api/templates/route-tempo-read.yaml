@@ -1,4 +1,33 @@
+{{/*
+Tempo read API routes — HTTP and gRPC (tempo.enabled=true)
+
+Resources (HTTP):
+  - HTTPRoute (tempo-read-api): routes read requests to tempo-query-frontend:3200.
+    Rule 1: matches path + X-Scope-OrgID header → strips /tempo prefix and forwards.
+    Rule 2: matches path only (no header) → strips /tempo prefix and returns 401.
+  - SecurityPolicy: enforces JWT validation using auth.jwt.providers.
+  - HTTPRouteFilter (rewrite): strips the /tempo prefix before forwarding
+    (/tempo/api/... → /api/...).
+  - HTTPRouteFilter (headers-check): returns 401 when X-Scope-OrgID header is missing.
+
+Exposed HTTP paths (all rewritten, /tempo prefix removed):
+  /tempo/api/echo, /tempo/api/status/buildinfo, /tempo/api/metrics/query_range,
+  /tempo/api/search, /tempo/api/v2/search, /tempo/api/traces, /tempo/api/v2/traces
+
+Resources (gRPC):
+  - HTTPRoute (tempo-read-api-grpc): routes gRPC requests to tempo-query-frontend:9095.
+    Rule 1: matches /tempopb + X-Scope-OrgID header → forwards to backend.
+    Rule 2: matches /tempopb only (no header) → returns 401 via HTTPRouteFilter.
+  - SecurityPolicy: enforces JWT validation using auth.jwt.providers.
+  - HTTPRouteFilter (headers-check): returns 401 when X-Scope-OrgID header is missing.
+
+Exposed gRPC path:
+  /tempopb  (matches any Tempo gRPC method, e.g. tempopb.StreamingQuerier/*)
+*/}}
 {{- if .Values.tempo.enabled -}}
+{{- if not .Values.auth.jwt.providers }}
+{{- fail "auth.jwt.providers must be set when tempo is enabled" }}
+{{- end }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -127,17 +156,9 @@ spec:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: {{ include "resource.default.name" . }}-tempo-read-api
-  extAuth:
-    http:
-      backendRefs:
-      - name: dex
-        namespace: giantswarm
-        port: 5556
-      path: /userinfo
-      headersToExtAuth:
-      - Authorization
-      - Cookie
-      - X-Scope-OrgID
+  jwt:
+    providers:
+      {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: HTTPRouteFilter
@@ -164,7 +185,7 @@ metadata:
 spec:
   directResponse:
     contentType: text/plain
-    statusCode: 400
+    statusCode: 401
     body:
       type: Inline
       inline: "Bad Request"
@@ -231,17 +252,9 @@ spec:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: {{ include "resource.default.name" . }}-tempo-read-api-grpc
-  extAuth:
-    http:
-      backendRefs:
-      - name: dex
-        namespace: giantswarm
-        port: 5556
-      path: /userinfo
-      headersToExtAuth:
-      - Authorization
-      - Cookie
-      - X-Scope-OrgID
+  jwt:
+    providers:
+      {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: HTTPRouteFilter
@@ -253,7 +266,7 @@ metadata:
 spec:
   directResponse:
     contentType: text/plain
-    statusCode: 400
+    statusCode: 401
     body:
       type: Inline
       inline: "Bad Request"

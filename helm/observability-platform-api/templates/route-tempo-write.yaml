@@ -1,4 +1,20 @@
+{{/*
+Tempo OTLP write API route (tempo.enabled=true)
+
+Resources:
+  - HTTPRoute: routes OTLP trace ingestion to tempo-distributor:4318 in tempo.namespace.
+    Rule 1: matches /v1/traces + X-Scope-OrgID header → forwards to backend.
+    Rule 2: matches /v1/traces only (no header) → returns 401 via HTTPRouteFilter.
+  - SecurityPolicy: enforces JWT validation using auth.jwt.providers.
+  - HTTPRouteFilter: returns 401 when X-Scope-OrgID header is missing.
+
+Exposed paths:
+  /v1/traces  (OTLP HTTP trace ingestion)
+*/}}
 {{- if .Values.tempo.enabled -}}
+{{- if not .Values.auth.jwt.providers }}
+{{- fail "auth.jwt.providers must be set when tempo is enabled" }}
+{{- end }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -62,17 +78,9 @@ spec:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: {{ include "resource.default.name" . }}-tempo-otlp-write-api
-  extAuth:
-    http:
-      backendRefs:
-      - name: dex
-        namespace: giantswarm
-        port: 5556
-      path: /userinfo
-      headersToExtAuth:
-      - Authorization
-      - Cookie
-      - X-Scope-OrgID
+  jwt:
+    providers:
+      {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: HTTPRouteFilter
@@ -84,7 +92,7 @@ metadata:
 spec:
   directResponse:
     contentType: text/plain
-    statusCode: 400
+    statusCode: 401
     body:
       type: Inline
       inline: "Bad Request"

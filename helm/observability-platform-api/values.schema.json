@@ -95,6 +95,41 @@
                 }
             }
         },
+        "auth": {
+            "type": "object",
+            "properties": {
+                "jwt": {
+                    "type": "object",
+                    "description": "JWT validation config for all routes. Supports multiple OIDC providers.",
+                    "properties": {
+                        "providers": {
+                            "type": "array",
+                            "description": "List of trusted JWT providers. Required when any service is enabled.",
+                            "items": {
+                                "type": "object",
+                                "required": ["name", "issuer", "remoteJWKS"],
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "issuer": {
+                                        "type": "string"
+                                    },
+                                    "remoteJWKS": {
+                                        "type": "object",
+                                        "properties": {
+                                            "uri": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "name": {
             "type": "string"
         },

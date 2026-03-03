@@ -1,4 +1,24 @@
+{{/*
+Mimir write API route (mimir.enabled=true)
+
+Resources:
+  - HTTPRoute: routes write requests to mimir-gateway:80 in mimir.namespace.
+    Rule 1: matches /prometheus/api/v1/push + X-Scope-OrgID header → rewrites path
+            (strips /prometheus prefix) and forwards to backend.
+    Rule 2: matches /prometheus/api/v1/push only (no header) → rewrites path and
+            returns 401 via HTTPRouteFilter.
+  - SecurityPolicy: enforces JWT validation using auth.jwt.providers.
+  - HTTPRouteFilter (rewrite): strips the /prometheus prefix before forwarding
+    (/prometheus/api/v1/push → /api/v1/push).
+  - HTTPRouteFilter (headers-check): returns 401 when X-Scope-OrgID header is missing.
+
+Exposed paths:
+  /prometheus/api/v1/push  (rewritten to /api/v1/push upstream)
+*/}}
 {{- if .Values.mimir.enabled -}}
+{{- if not .Values.auth.jwt.providers }}
+{{- fail "auth.jwt.providers must be set when mimir is enabled" }}
+{{- end }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -72,17 +92,9 @@ spec:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: {{ include "resource.default.name" . }}-mimir-write-api
-  extAuth:
-    http:
-      backendRefs:
-      - name: oauth2-proxy-observability-platform-api
-        namespace: monitoring
-        port: 4180
-      path: /oauth2/observability-platform-api/auth
-      headersToExtAuth:
-      - Authorization
-      - Cookie
-      - X-Scope-OrgID
+  jwt:
+    providers:
+      {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: HTTPRouteFilter
@@ -109,7 +121,7 @@ metadata:
 spec:
   directResponse:
     contentType: text/plain
-    statusCode: 400
+    statusCode: 401
     body:
       type: Inline
       inline: "Bad Request"

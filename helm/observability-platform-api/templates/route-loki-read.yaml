@@ -1,4 +1,22 @@
+{{/*
+Loki read API routes (loki.enabled=true)
+
+Resources:
+  - HTTPRoute: routes read requests to loki-gateway:80 in loki.namespace.
+    Rule 1: matches path + X-Scope-OrgID header (regex ^.+$) → forwards to backend.
+    Rule 2: matches path only (no header) → returns 401 via HTTPRouteFilter.
+  - SecurityPolicy: enforces JWT validation using auth.jwt.providers.
+  - HTTPRouteFilter: returns 401 when X-Scope-OrgID header is missing.
+
+Exposed paths:
+  /loki/api/v1/labels, /loki/api/v1/label, /loki/api/v1/rules,
+  /loki/api/v1/query, /loki/api/v1/query_range, /loki/api/v1/index,
+  /loki/api/v1/series, /loki/api/v1/detected_labels
+*/}}
 {{- if .Values.loki.enabled -}}
+{{- if not .Values.auth.jwt.providers }}
+{{- fail "auth.jwt.providers must be set when loki is enabled" }}
+{{- end }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -132,17 +150,9 @@ spec:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: {{ include "resource.default.name" . }}-loki-read-api
-  extAuth:
-    http:
-      backendRefs:
-      - name: dex
-        namespace: giantswarm
-        port: 5556
-      path: /userinfo
-      headersToExtAuth:
-      - Authorization
-      - Cookie
-      - X-Scope-OrgID
+  jwt:
+    providers:
+      {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: HTTPRouteFilter
@@ -154,7 +164,7 @@ metadata:
 spec:
   directResponse:
     contentType: text/plain
-    statusCode: 400
+    statusCode: 401
     body:
       type: Inline
       inline: "Bad Request"

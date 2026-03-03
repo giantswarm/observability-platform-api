@@ -1,6 +1,24 @@
 name: observability-platform-api
 serviceType: managed
 
+# -- Auth configuration for all routes.
+auth:
+  jwt:
+    # -- List of trusted JWT providers. Each entry must be a valid OIDC issuer.
+    # Supports multiple providers (e.g. Dex + Azure AD).
+    # Required when any of loki.enabled, mimir.enabled, or tempo.enabled is true.
+    providers: []
+    # Example:
+    # providers:
+    # - name: dex
+    #   issuer: "https://dex.mycluster.example.com"
+    #   remoteJWKS:
+    #     uri: "https://dex.mycluster.example.com/keys"
+    # - name: azure-ad
+    #   issuer: "https://login.microsoftonline.com/<tenant-id>/v2.0"
+    #   remoteJWKS:
+    #     uri: "https://login.microsoftonline.com/<tenant-id>/discovery/v2.0/keys"
+
 loki:
   enabled: false
   namespace: loki

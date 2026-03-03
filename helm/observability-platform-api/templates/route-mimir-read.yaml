@@ -1,4 +1,23 @@
+{{/*
+Mimir read API routes (mimir.enabled=true)
+
+Resources:
+  - HTTPRoute: routes read requests to mimir-gateway:80 in mimir.namespace.
+    Rule 1: matches path + X-Scope-OrgID header (regex ^.+$) → forwards to backend.
+    Rule 2: matches path only (no header) → returns 401 via HTTPRouteFilter.
+  - SecurityPolicy: enforces JWT validation using auth.jwt.providers.
+  - HTTPRouteFilter: returns 401 when X-Scope-OrgID header is missing.
+
+Exposed paths (Prometheus-compatible API):
+  /prometheus/api/v1/labels, /prometheus/api/v1/label, /prometheus/api/v1/rules,
+  /prometheus/api/v1/query, /prometheus/api/v1/query_range,
+  /prometheus/api/v1/query_exemplars, /prometheus/api/v1/status,
+  /prometheus/api/v1/metadata, /prometheus/api/v1/detected_labels
+*/}}
 {{- if .Values.mimir.enabled -}}
+{{- if not .Values.auth.jwt.providers }}
+{{- fail "auth.jwt.providers must be set when mimir is enabled" }}
+{{- end }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -142,17 +161,9 @@ spec:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: {{ include "resource.default.name" . }}-mimir-read-api
-  extAuth:
-    http:
-      backendRefs:
-      - name: dex
-        namespace: giantswarm
-        port: 5556
-      path: /userinfo
-      headersToExtAuth:
-      - Authorization
-      - Cookie
-      - X-Scope-OrgID
+  jwt:
+    providers:
+      {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: HTTPRouteFilter
@@ -164,7 +175,7 @@ metadata:
 spec:
   directResponse:
     contentType: text/plain
-    statusCode: 400
+    statusCode: 401
     body:
       type: Inline
       inline: "Bad Request"

@@ -1,4 +1,20 @@
+{{/*
+Loki write API route (loki.enabled=true)
+
+Resources:
+  - HTTPRoute: routes write requests to loki-gateway:80 in loki.namespace.
+    Rule 1: matches /loki/api/v1/push + X-Scope-OrgID header → forwards to backend.
+    Rule 2: matches /loki/api/v1/push only (no header) → returns 401 via HTTPRouteFilter.
+  - SecurityPolicy: enforces JWT validation using auth.jwt.providers.
+  - HTTPRouteFilter: returns 401 when X-Scope-OrgID header is missing.
+
+Exposed paths:
+  /loki/api/v1/push
+*/}}
 {{- if .Values.loki.enabled -}}
+{{- if not .Values.auth.jwt.providers }}
+{{- fail "auth.jwt.providers must be set when loki is enabled" }}
+{{- end }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -62,17 +78,9 @@ spec:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: {{ include "resource.default.name" . }}-loki-write-api
-  extAuth:
-    http:
-      backendRefs:
-      - name: oauth2-proxy-observability-platform-api
-        namespace: monitoring
-        port: 4180
-      path: /oauth2/observability-platform-api/auth
-      headersToExtAuth:
-      - Authorization
-      - Cookie
-      - X-Scope-OrgID
+  jwt:
+    providers:
+      {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: HTTPRouteFilter
@@ -84,7 +92,7 @@ metadata:
 spec:
   directResponse:
     contentType: text/plain
-    statusCode: 400
+    statusCode: 401
     body:
       type: Inline
       inline: "Bad Request"
