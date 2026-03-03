@@ -11,10 +11,7 @@ Resources:
 Exposed paths:
   /v1/traces  (OTLP HTTP trace ingestion)
 */}}
-{{- if .Values.tempo.enabled -}}
-{{- if not .Values.auth.jwt.providers }}
-{{- fail "auth.jwt.providers must be set when tempo is enabled" }}
-{{- end }}
+{{- if and .Values.tempo.enabled .Values.auth.jwt.providers -}}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

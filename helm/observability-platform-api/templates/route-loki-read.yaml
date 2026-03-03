@@ -13,10 +13,7 @@ Exposed paths:
   /loki/api/v1/query, /loki/api/v1/query_range, /loki/api/v1/index,
   /loki/api/v1/series, /loki/api/v1/detected_labels
 */}}
-{{- if .Values.loki.enabled -}}
-{{- if not .Values.auth.jwt.providers }}
-{{- fail "auth.jwt.providers must be set when loki is enabled" }}
-{{- end }}
+{{- if and .Values.loki.enabled .Values.auth.jwt.providers -}}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

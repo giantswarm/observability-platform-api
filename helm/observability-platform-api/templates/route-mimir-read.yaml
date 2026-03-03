@@ -14,10 +14,7 @@ Exposed paths (Prometheus-compatible API):
   /prometheus/api/v1/query_exemplars, /prometheus/api/v1/status,
   /prometheus/api/v1/metadata, /prometheus/api/v1/detected_labels
 */}}
-{{- if .Values.mimir.enabled -}}
-{{- if not .Values.auth.jwt.providers }}
-{{- fail "auth.jwt.providers must be set when mimir is enabled" }}
-{{- end }}
+{{- if and .Values.mimir.enabled .Values.auth.jwt.providers -}}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
