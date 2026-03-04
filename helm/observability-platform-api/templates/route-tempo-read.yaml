@@ -1,0 +1,242 @@
+{{/*
+Tempo read API routes — HTTP and gRPC (tempo.enabled=true)
+
+Resources (HTTP):
+  - HTTPRoute (tempo-read-api): routes read requests to tempo-query-frontend:3200.
+    Rule 1: matches path + X-Scope-OrgID header → strips /tempo prefix and forwards.
+    Rule 2: matches path only (no header) → returns 401 via HTTPRouteFilter.
+  - SecurityPolicy: enforces JWT validation using auth.jwt.providers.
+  - HTTPRouteFilter (rewrite): strips the /tempo prefix before forwarding
+    (/tempo/api/... → /api/...).
+  - HTTPRouteFilter (headers-check): returns 401 when X-Scope-OrgID header is missing.
+
+Exposed HTTP paths (all rewritten, /tempo prefix removed):
+  /tempo/api/echo, /tempo/api/status/buildinfo, /tempo/api/metrics/query_range,
+  /tempo/api/search, /tempo/api/v2/search, /tempo/api/traces, /tempo/api/v2/traces
+
+Resources (gRPC):
+  - GRPCRoute (tempo-read-api-grpc): routes gRPC requests to tempo-query-frontend:9095.
+    Single rule: matches tempopb.* service + X-Scope-OrgID header → forwards to backend.
+    Requests missing X-Scope-OrgID do not match and are rejected by Envoy (no route match).
+    Note: GRPCRoute does not support HTTPRouteFilter ExtensionRef, so a directResponse
+    rule cannot be used; missing-header requests get a non-401 rejection instead.
+  - SecurityPolicy: enforces JWT validation using auth.jwt.providers.
+
+Exposed gRPC path:
+  any service matching regex "tempopb\.[^/]+"  (e.g. tempopb.StreamingQuerier, tempopb.Querier)
+*/}}
+{{- if and .Values.tempo.enabled .Values.auth.jwt.providers -}}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo-read-api
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  {{- with .Values.tempo.parentRefs }}
+  parentRefs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.tempo.hostname }}
+  hostnames:
+  - {{ tpl . $ | quote }}
+  {{- end }}
+  rules:
+  - backendRefs:
+    - name: tempo-query-frontend
+      namespace: {{ .Values.tempo.namespace }}
+      port: 3200
+    matches:
+    - path:
+        type: PathPrefix
+        value: /tempo/api/echo
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    - path:
+        type: PathPrefix
+        value: /tempo/api/status/buildinfo
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    - path:
+        type: PathPrefix
+        value: /tempo/api/metrics/query_range
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    - path:
+        type: PathPrefix
+        value: /tempo/api/search
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    - path:
+        type: PathPrefix
+        value: /tempo/api/v2/search
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    - path:
+        type: PathPrefix
+        value: /tempo/api/traces
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    - path:
+        type: PathPrefix
+        value: /tempo/api/v2/traces
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: {{ include "resource.default.name" . }}-tempo-read-api-rewrite
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set:
+        - name: X-Scope-OrgID
+          value: "%REQ(X-Scope-OrgID)%"
+  - backendRefs:
+    - name: tempo-query-frontend
+      namespace: {{ .Values.tempo.namespace }}
+      port: 3200
+    filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: {{ include "resource.default.name" . }}-tempo-read-api-headers-check
+    matches:
+    - path:
+        type: PathPrefix
+        value: /tempo/api/echo
+    - path:
+        type: PathPrefix
+        value: /tempo/api/status/buildinfo
+    - path:
+        type: PathPrefix
+        value: /tempo/api/metrics/query_range
+    - path:
+        type: PathPrefix
+        value: /tempo/api/search
+    - path:
+        type: PathPrefix
+        value: /tempo/api/v2/search
+    - path:
+        type: PathPrefix
+        value: /tempo/api/traces
+    - path:
+        type: PathPrefix
+        value: /tempo/api/v2/traces
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo-read-api
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ include "resource.default.name" . }}-tempo-read-api
+  jwt:
+    providers:
+      {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: HTTPRouteFilter
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo-read-api-rewrite
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  urlRewrite:
+    path:
+      type: ReplaceRegexMatch
+      replaceRegexMatch:
+        pattern: "^/tempo(/.*)$"
+        substitution: "\\1"
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: HTTPRouteFilter
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo-read-api-headers-check
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  directResponse:
+    contentType: text/plain
+    statusCode: 401
+    body:
+      type: Inline
+      inline: "Bad Request"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo-read-api-grpc
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  {{- with .Values.tempo.parentRefs }}
+  parentRefs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.tempo.hostname }}
+  hostnames:
+  - {{ tpl . $ | quote }}
+  {{- end }}
+  rules:
+  - backendRefs:
+    - name: tempo-query-frontend
+      namespace: {{ .Values.tempo.namespace }}
+      port: 9095
+    matches:
+    - method:
+        service: "tempopb\\.[^/]+"
+        type: RegularExpression
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    filters:
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set:
+        - name: X-Scope-OrgID
+          value: "%REQ(X-Scope-OrgID)%"
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo-read-api-grpc
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: GRPCRoute
+    name: {{ include "resource.default.name" . }}-tempo-read-api-grpc
+  jwt:
+    providers:
+      {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
+{{- end }}

@@ -1,0 +1,31 @@
+auth:
+  jwt:
+    providers:
+    - name: azure-ad
+      issuer: "https://login.microsoftonline.com/my-tenant/v2.0"
+      remoteJWKS:
+        uri: "https://login.microsoftonline.com/my-tenant/discovery/v2.0/keys"
+
+loki:
+  enabled: true
+  hostname: "observability.test.example.com"
+  namespace: loki
+  parentRefs:
+  - name: giantswarm-default
+    namespace: envoy-gateway-system
+
+mimir:
+  enabled: true
+  hostname: "observability.test.example.com"
+  namespace: mimir
+  parentRefs:
+  - name: giantswarm-default
+    namespace: envoy-gateway-system
+
+tempo:
+  enabled: true
+  hostname: "observability.test.example.com"
+  namespace: tempo
+  parentRefs:
+  - name: giantswarm-default
+    namespace: envoy-gateway-system

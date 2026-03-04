@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add Gateway API `HTTPRoute` resources for Loki, Mimir, and Tempo (read and write), replacing the previous NGINX ingress setup.
+- Add native JWT authentication via Envoy Gateway `SecurityPolicy.jwt`, supporting multiple OIDC providers (e.g. Dex, Azure AD). Configurable via `auth.jwt.providers`.
+- Add `/loki/api/v1/rules` to the Loki read routes.
+- Add `GRPCRoute` for Tempo gRPC traffic (port 9095), routing all `tempopb.*` services to `tempo-query-frontend` with JWT enforcement via `SecurityPolicy`.
+
+### Changed
+
+- Replace NGINX ingress-based auth (`nginx.ingress.kubernetes.io/auth-url`) with Envoy Gateway `SecurityPolicy` JWT validation — no external auth service (oauth2-proxy or Dex extAuth) required.
+- Change missing `X-Scope-OrgID` response code from `400` to `401` across all routes.
+- When `auth.jwt.providers` is empty and a service is enabled, routes are silently not rendered (no chart error). Previously the chart would fail with an error.
+- Fix Tempo gRPC route service regex from `tempopb` to `tempopb\.[^/]+` to correctly match package-qualified service names (e.g. `tempopb.StreamingQuerier`).
+
+### Removed
+
+- Remove dependency on oauth2-proxy for write route authentication.
+- Remove Envoy Gateway `Backend` CRD and `extAuth` configuration in favour of inline JWT validation.
+
 ## [0.1.2] - 2026-02-12
 
 ### Changed
@@ -19,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Build with up-to-date pipelines.
 - Enable TLS secret configuration for the ingresses. The default now changes to having a single shared secret per host in one namespace to avoid Let's Encrypt rate limiting
+- Add Gateway API and Envoy Gateway resources.
 
 ## [0.1.0] - 2025-01-29
 
