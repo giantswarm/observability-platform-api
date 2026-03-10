@@ -5,11 +5,14 @@ Resources:
   - HTTPRoute: routes write requests to loki-gateway:80 in loki.namespace.
     Rule 1: matches /loki/api/v1/push + X-Scope-OrgID header → forwards to backend.
     Rule 2: matches /loki/api/v1/push only (no header) → returns 401 via HTTPRouteFilter.
+    Rule 3: matches /otlp/v1/logs + X-Scope-OrgID header → forwards to backend (no rewrite).
+    Rule 4: matches /otlp/v1/logs only (no header) → returns 401 via HTTPRouteFilter.
   - SecurityPolicy: enforces JWT validation using auth.jwt.providers.
   - HTTPRouteFilter: returns 401 when X-Scope-OrgID header is missing.
 
 Exposed paths:
   /loki/api/v1/push
+  /otlp/v1/logs    (forwarded as-is; nginx gateway proxies to Loki OTLP ingest)
 */}}
 {{- if and .Values.loki.enabled .Values.auth.jwt.providers -}}
 ---
@@ -62,6 +65,38 @@ spec:
     - path:
         type: PathPrefix
         value: /loki/api/v1/push
+  - backendRefs:
+    - name: loki-gateway
+      namespace: {{ .Values.loki.namespace }}
+      port: 80
+    matches:
+    - path:
+        type: PathPrefix
+        value: /otlp/v1/logs
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    filters:
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set:
+        - name: X-Scope-OrgID
+          value: "%REQ(X-Scope-OrgID)%"
+  - backendRefs:
+    - name: loki-gateway
+      namespace: {{ .Values.loki.namespace }}
+      port: 80
+    filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: {{ include "resource.default.name" . }}-loki-write-api-headers-check
+    matches:
+    - path:
+        type: PathPrefix
+        value: /otlp/v1/logs
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
