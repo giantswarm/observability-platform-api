@@ -188,6 +188,50 @@ curl -si -X POST "$BASE/prometheus/api/v1/push" -H "$AUTH"   # expect 401
 curl -si -X POST "$BASE/prometheus/api/v1/push" -H "$SCOPE"  # expect 401
 ```
 
+### Mimir write — OTLP HTTP
+
+Backend: `mimir-gateway:80`. No path rewrite. Path: `/otlp/v1/metrics`.
+
+> **Label promotion**: Mimir maps `service.name` + `service.namespace` to `job` as `"<namespace>/<name>"`.
+> Other resource attributes are written to a separate `target_info` metric rather than promoted to labels.
+
+```bash
+# Push a counter with resource attributes
+curl -si -X POST "$BASE/otlp/v1/metrics" \
+  -H "$AUTH" -H "$SCOPE" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resourceMetrics": [{
+      "resource": {
+        "attributes": [
+          {"key": "service.name", "value": {"stringValue": "otlp-test"}},
+          {"key": "service.namespace", "value": {"stringValue": "my-namespace"}}
+        ]
+      },
+      "scopeMetrics": [{
+        "metrics": [{
+          "name": "test_counter_total",
+          "sum": {
+            "aggregationTemporality": 2,
+            "isMonotonic": true,
+            "dataPoints": [{"asDouble": 1.0, "timeUnixNano": "'"$(date +%s%N)"'"}]
+          }
+        }]
+      }]
+    }]
+  }'
+# expect: 200 {}
+
+# Verify ingestion — job label is "my-namespace/otlp-test"
+curl -s "$BASE/prometheus/api/v1/query" \
+  -H "$AUTH" -H "$SCOPE" \
+  --data-urlencode 'query=test_counter_total{job="my-namespace/otlp-test"}' | jq '.data.result'
+# expect: non-empty result with value 1
+
+curl -si -X POST "$BASE/otlp/v1/metrics" -H "$AUTH"   # expect 401
+curl -si -X POST "$BASE/otlp/v1/metrics" -H "$SCOPE"  # expect 401
+```
+
 ### Tempo read — HTTP
 
 Backend: `tempo-query-frontend:3200`. Path rewrite: `/tempo` prefix stripped before forwarding.
@@ -209,6 +253,48 @@ done
 # expect: 200, 400 (params required), or 404 (trace not found) — not 401/403
 ```
 
+### Loki write — HTTP OTLP
+
+Backend: `loki-gateway:80`. Path: `/otlp/v1/logs`.
+
+> **Label promotion**: Loki maps `service.name` to the `service_name` stream label (not `job`).
+> Query logs with `{service_name="<value>"}` after ingestion.
+
+```bash
+curl -si -X POST "$BASE/otlp/v1/logs" \
+  -H "$AUTH" -H "$SCOPE" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resourceLogs": [{
+      "resource": {
+        "attributes": [
+          {"key": "service.name", "value": {"stringValue": "otlp-test"}}
+        ]
+      },
+      "scopeLogs": [{
+        "logRecords": [{
+          "timeUnixNano": "'"$(date +%s%N)"'",
+          "severityText": "INFO",
+          "body": {"stringValue": "hello from otlp http"}
+        }]
+      }]
+    }]
+  }'
+# expect: 204
+
+# Verify ingestion — service.name maps to service_name stream label
+curl -s "$BASE/loki/api/v1/query_range" \
+  -H "$AUTH" -H "$SCOPE" \
+  --data-urlencode 'query={service_name="otlp-test"}' \
+  --data-urlencode "start=$(date -d '5 minutes ago' +%s%N)" \
+  --data-urlencode "end=$(date +%s%N)" \
+  | jq '.data.result'
+# expect: non-empty array with your log line
+
+curl -si -X POST "$BASE/otlp/v1/logs" -H "$AUTH"   # expect 401
+curl -si -X POST "$BASE/otlp/v1/logs" -H "$SCOPE"  # expect 401
+```
+
 ### Loki write — gRPC OTLP
 
 Backend: `loki-distributor:9095`. Separate `GRPCRoute` — bypasses `loki-gateway` (nginx does not handle gRPC).
@@ -216,7 +302,36 @@ Backend: `loki-distributor:9095`. Separate `GRPCRoute` — bypasses `loki-gatewa
 > **Note on missing `X-Scope-OrgID`**: `GRPCRoute` does not support `HTTPRouteFilter` via `ExtensionRef`, so requests missing `X-Scope-OrgID` get a no-route rejection rather than a strict 401.
 
 ```bash
-# Valid auth — request reaches Loki, grpc-status: 12 (UNIMPLEMENTED) confirms routing succeeded
+# Push logs with a real payload using grpcurl
+grpcurl \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Scope-OrgID: $ORG" \
+  -d '{
+    "resourceLogs": [{
+      "resource": {
+        "attributes": [{"key": "service.name", "value": {"stringValue": "otlp-test-grpc"}}]
+      },
+      "scopeLogs": [{
+        "logRecords": [{
+          "severityText": "INFO",
+          "body": {"stringValue": "hello from otlp grpc"}
+        }]
+      }]
+    }]
+  }' \
+  "$GRPC_HOST:443" \
+  opentelemetry.proto.collector.logs.v1.LogsService/Export
+# expect: {} (empty response = success)
+
+# Verify ingestion
+curl -s "$BASE/loki/api/v1/query_range" \
+  -H "$AUTH" -H "$SCOPE" \
+  --data-urlencode 'query={service_name="otlp-test-grpc"}' \
+  --data-urlencode "start=$(date -d '5 minutes ago' +%s%N)" \
+  --data-urlencode "end=$(date +%s%N)" \
+  | jq '.data.result'
+
+# Auth check — bare gRPC frame (no payload), grpc-status: 12 = backend reached
 curl -si --http2 -X POST "https://$GRPC_HOST/opentelemetry.proto.collector.logs.v1.LogsService/Export" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Scope-OrgID: $ORG" \
@@ -324,15 +439,11 @@ kubectl get securitypolicy -A
 # All policies should show ACCEPTED=True
 
 RELEASE="observability-platform-api"
-# One consolidated SecurityPolicy per service for Loki and Mimir (covers all routes in that namespace).
-# Tempo has separate policies per route because the GRPCRoute requires its own targetRef.
+# One consolidated SecurityPolicy per service (covers all routes in that namespace).
 for NS_NAME in \
   "loki/$RELEASE-loki" \
   "mimir/$RELEASE-mimir" \
-  "tempo/$RELEASE-tempo-read-api" \
-  "tempo/$RELEASE-tempo-read-api-grpc" \
-  "tempo/$RELEASE-tempo-otlp-write-api" \
-  "tempo/$RELEASE-tempo-write-api-grpc"; do
+  "tempo/$RELEASE-tempo"; do
   NS=$(echo $NS_NAME | cut -d/ -f1)
   NAME=$(echo $NS_NAME | cut -d/ -f2)
   STATUS=$(kubectl get securitypolicy -n $NS $NAME -o json 2>/dev/null \
