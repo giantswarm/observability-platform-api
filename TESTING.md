@@ -93,6 +93,31 @@ TOKEN=$(kubectl oidc-login get-token \
   --oidc-client-id=<client-id> | jq -r '.status.token')
 ```
 
+## 2b. Get Basic Auth credentials
+
+The BasicAuth credentials are stored in per-service Kubernetes Secrets in htpasswd format. The secret names follow the pattern `<service>-gateway-httproute-auth` in each service namespace.
+
+List available usernames in the secret (passwords are one-way SHA-hashed — you need to know the original password):
+
+```bash
+# Example for loki (same pattern for mimir and tempo)
+kubectl get secret loki-gateway-httproute-auth -n loki \
+  -o jsonpath='{.data.\.htpasswd}' | base64 -d | cut -d: -f1
+```
+
+If you need to create a new test user with a known password:
+
+```bash
+# Add a test user to an existing secret
+EXISTING=$(kubectl get secret loki-gateway-httproute-auth -n loki \
+  -o jsonpath='{.data.\.htpasswd}' | base64 -d)
+NEW_ENTRY=$(htpasswd -nb testuser testpassword)
+kubectl create secret generic loki-gateway-httproute-auth \
+  --from-literal=".htpasswd=${EXISTING}
+${NEW_ENTRY}" \
+  -n loki --dry-run=client -o yaml | kubectl apply -f -
+```
+
 ## 3. Set test variables
 
 ```bash
@@ -100,10 +125,11 @@ BASE="https://observability.<codename>.<base-domain>"
 ORG="my-tenant"
 AUTH="Authorization: Bearer $TOKEN"
 SCOPE="X-Scope-OrgID: $ORG"
+GRPC_HOST="${BASE#https://}"
 
-# For Basic Auth testing (replace with actual credentials from the .htpasswd secret)
-BASIC_USER="myuser"
-BASIC_PASS="mypassword"
+# For Basic Auth testing — use credentials from the secret (see section 2b above)
+BASIC_USER="<username from secret>"
+BASIC_PASS="<password — look up in vault or create a test user>"
 BASIC_AUTH="Authorization: Basic $(echo -n "$BASIC_USER:$BASIC_PASS" | base64)"
 ```
 
