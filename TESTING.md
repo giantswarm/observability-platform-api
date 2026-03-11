@@ -6,7 +6,7 @@ This document describes how to configure and test all exposed routes (Loki, Mimi
 
 - Access to a management cluster with the app deployed
 - `curl` and `jq` installed
-- `grpcurl` installed (for Tempo gRPC testing)
+- `grpcurl` installed (for Tempo and Loki gRPC testing)
 - An Azure AD app registration with a client secret, or a Dex OIDC client
 
 ## 1. Helm template check
@@ -230,9 +230,32 @@ done
 # expect: 200, 400 (params required), or 404 (trace not found) — not 401/403
 ```
 
+### Loki write — gRPC OTLP
+
+Backend: `loki-distributor:9095`. Separate `GRPCRoute` — bypasses `loki-gateway` (nginx does not handle gRPC).
+
+> **Note on missing `X-Scope-OrgID`**: `GRPCRoute` does not support `HTTPRouteFilter` via `ExtensionRef`, so requests missing `X-Scope-OrgID` get a no-route rejection rather than a strict 401.
+
+```bash
+# Valid auth — request reaches Loki, grpc-status: 12 (UNIMPLEMENTED) confirms routing succeeded
+curl -si --http2 -X POST "https://$GRPC_HOST/opentelemetry.proto.collector.logs.v1.LogsService/Export" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Scope-OrgID: $ORG" \
+  -H "Content-Type: application/grpc" \
+  --data-binary $'\x00\x00\x00\x00\x00'
+# expect: grpc-status: 12 (not 16)
+
+# No JWT — SecurityPolicy returns grpc-status: 16 (UNAUTHENTICATED)
+curl -si --http2 -X POST "https://$GRPC_HOST/opentelemetry.proto.collector.logs.v1.LogsService/Export" \
+  -H "X-Scope-OrgID: $ORG" \
+  -H "Content-Type: application/grpc" \
+  --data-binary $'\x00\x00\x00\x00\x00'
+# expect: grpc-status: 16
+```
+
 ### Tempo read — gRPC
 
-Backend: `tempo-query-frontend:9095`. Separate HTTPRoute from the HTTP routes above.
+Backend: `tempo-query-frontend:9095`. Separate `GRPCRoute` from the HTTP routes above.
 
 > **Note on GRPCRoute**: The gRPC route uses `GRPCRoute` (not `HTTPRoute`) because Envoy
 > Gateway's SecurityPolicy JWT enforcement does not correctly apply to gRPC traffic routed
@@ -300,11 +323,11 @@ kubectl get securitypolicy -A
 # All policies should show ACCEPTED=True
 
 RELEASE="observability-platform-api"
+# One consolidated SecurityPolicy per service for Loki and Mimir (covers all routes in that namespace).
+# Tempo has separate policies per route because the GRPCRoute requires its own targetRef.
 for NS_NAME in \
-  "loki/$RELEASE-loki-read-api" \
-  "loki/$RELEASE-loki-write-api" \
-  "mimir/$RELEASE-mimir-read-api" \
-  "mimir/$RELEASE-mimir-write-api" \
+  "loki/$RELEASE-loki" \
+  "mimir/$RELEASE-mimir" \
   "tempo/$RELEASE-tempo-read-api" \
   "tempo/$RELEASE-tempo-read-api-grpc" \
   "tempo/$RELEASE-tempo-otlp-write-api"; do

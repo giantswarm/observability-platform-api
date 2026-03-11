@@ -32,7 +32,7 @@ This repository contains the Helm chart and configuration templates for creating
 
 ### Route Management
 
-The observability-platform-api creates separate `HTTPRoute` resources under a unified domain for direct access to observability backends. Each route is secured by an Envoy Gateway `SecurityPolicy` (JWT validation) and enforces the `X-Scope-OrgID` tenant header.
+The observability-platform-api creates `HTTPRoute` and `GRPCRoute` resources under a unified domain for direct access to observability backends. Each route is secured by an Envoy Gateway `SecurityPolicy` (JWT and/or Basic Auth) and enforces the `X-Scope-OrgID` tenant header.
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -49,7 +49,8 @@ The observability-platform-api creates separate `HTTPRoute` resources under a un
 │             │ /loki/api/v1/rules                                           │                                  │               │
 │             │ /loki/api/v1/detected_labels                                 │                                  │               │
 │ HTTPS       │ /loki/api/v1/push                                            │ Logs / Loki                      │ Write         │
-│ HTTPS       │ /otlp/v1/logs                                                │ Logs / Loki (OTLP)               │ Write         │
+│ HTTPS       │ /otlp/v1/logs                                                │ Logs / Loki (OTLP HTTP)          │ Write         │
+│ gRPC (+TLS) │ opentelemetry.proto.collector.logs.v1.LogsService            │ Logs / Loki (OTLP gRPC)          │ Write         │
 │ HTTPS       │ /prometheus/api/v1/query                                     │ Metrics / Mimir                  │ Read          │
 │             │ /prometheus/api/v1/query_range                               │                                  │               │
 │             │ /prometheus/api/v1/query_exemplars                           │                                  │               │
@@ -133,7 +134,7 @@ When both JWT and Basic Auth are configured for the same service, routes accept 
 
 ### Multi-Route Design
 
-This app creates multiple `HTTPRoute` resources rather than a single route because:
+This app creates multiple `HTTPRoute` and `GRPCRoute` resources (one per service per direction) rather than a single route because:
 
 **Benefits:**
 - **Granular Control**: Each service can have independent configuration and lifecycle
@@ -141,11 +142,19 @@ This app creates multiple `HTTPRoute` resources rather than a single route becau
 - **Feature Flags**: Individual routes can be enabled/disabled based on cluster capabilities
 - **Security Boundaries**: Each service can be independently enabled or disabled without affecting others
 
+**Template structure** — templates are organised per service under `templates/loki/`, `templates/mimir/`, and `templates/tempo/`. Each directory contains:
+- `route-read.yaml` — HTTP read `HTTPRoute`
+- `route-write.yaml` — HTTP write `HTTPRoute`
+- `route-grpc.yaml` — gRPC `GRPCRoute` (Loki write OTLP / Tempo read)
+- `securitypolicy.yaml` — one `SecurityPolicy` per service (covers all routes in that namespace)
+- `filters.yaml` — shared `HTTPRouteFilter` resources (headers-check and path rewrite where applicable)
+
 **Operational Considerations:**
 
 - All routes share the same hostname and `X-Scope-OrgID` enforcement
 - JWT providers (`auth.jwt.providers`) are shared across all services; Basic Auth secrets are per-service
 - JWT validation is done inline by Envoy Gateway — no external auth service required
+- gRPC routes (`GRPCRoute`) do not support `HTTPRouteFilter` via `ExtensionRef`, so missing `X-Scope-OrgID` on gRPC requests results in a no-route rejection rather than a strict 401
 
 ## Configuration & Deployment
 
