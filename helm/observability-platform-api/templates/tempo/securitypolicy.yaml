@@ -1,18 +1,16 @@
 {{/*
-Tempo SecurityPolicies (tempo.enabled=true)
+Tempo SecurityPolicy (tempo.enabled=true)
 
-Resources:
-  - SecurityPolicy (tempo-read-api): enforces JWT on the tempo-read-api HTTPRoute.
-  - SecurityPolicy (tempo-read-api-grpc): enforces JWT on the tempo-read-api-grpc GRPCRoute.
-  - SecurityPolicy (tempo-otlp-write-api): enforces JWT on the tempo-otlp-write-api HTTPRoute.
-  - SecurityPolicy (tempo-write-api-grpc): enforces JWT on the tempo-write-api-grpc GRPCRoute.
+Applies JWT to all Tempo routes (read HTTPRoute, read GRPCRoute, OTLP write HTTPRoute,
+write GRPCRoute) in a single policy.
+Auth is configured via auth.jwt.providers.
 */}}
 {{- if and .Values.tempo.enabled .Values.auth.jwt.providers -}}
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata:
-  name: {{ include "resource.default.name" . }}-tempo-read-api
+  name: {{ include "resource.default.name" . }}-tempo
   namespace: {{ .Values.tempo.namespace }}
   labels:
     {{- include "labels.common" . | nindent 4 }}
@@ -21,51 +19,12 @@ spec:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: {{ include "resource.default.name" . }}-tempo-read-api
-  jwt:
-    providers:
-      {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
----
-apiVersion: gateway.envoyproxy.io/v1alpha1
-kind: SecurityPolicy
-metadata:
-  name: {{ include "resource.default.name" . }}-tempo-read-api-grpc
-  namespace: {{ .Values.tempo.namespace }}
-  labels:
-    {{- include "labels.common" . | nindent 4 }}
-spec:
-  targetRefs:
   - group: gateway.networking.k8s.io
     kind: GRPCRoute
     name: {{ include "resource.default.name" . }}-tempo-read-api-grpc
-  jwt:
-    providers:
-      {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
----
-apiVersion: gateway.envoyproxy.io/v1alpha1
-kind: SecurityPolicy
-metadata:
-  name: {{ include "resource.default.name" . }}-tempo-otlp-write-api
-  namespace: {{ .Values.tempo.namespace }}
-  labels:
-    {{- include "labels.common" . | nindent 4 }}
-spec:
-  targetRefs:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: {{ include "resource.default.name" . }}-tempo-otlp-write-api
-  jwt:
-    providers:
-      {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
----
-apiVersion: gateway.envoyproxy.io/v1alpha1
-kind: SecurityPolicy
-metadata:
-  name: {{ include "resource.default.name" . }}-tempo-write-api-grpc
-  namespace: {{ .Values.tempo.namespace }}
-  labels:
-    {{- include "labels.common" . | nindent 4 }}
-spec:
-  targetRefs:
   - group: gateway.networking.k8s.io
     kind: GRPCRoute
     name: {{ include "resource.default.name" . }}-tempo-write-api-grpc
