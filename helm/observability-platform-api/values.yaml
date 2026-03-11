@@ -31,6 +31,20 @@ loki:
     # -- Name of a Kubernetes Secret with .htpasswd-formatted credentials in the loki namespace.
     # When set alongside auth.jwt.providers, routes accept either Basic Auth or JWT.
     secretName: ""
+  # -- Paths exposed on the Loki read route. Each path is matched with PathPrefix.
+  readPaths:
+  - /loki/api/v1/labels
+  - /loki/api/v1/label
+  - /loki/api/v1/rules
+  - /loki/api/v1/query
+  - /loki/api/v1/index
+  - /loki/api/v1/query_range
+  - /loki/api/v1/series
+  - /loki/api/v1/detected_labels
+  # -- Paths exposed on the Loki write route. Each path is matched with PathPrefix and forwarded as-is.
+  writePaths:
+  - /loki/api/v1/push
+  - /otlp/v1/logs
 
 mimir:
   enabled: false
@@ -44,6 +58,23 @@ mimir:
     # -- Name of a Kubernetes Secret with .htpasswd-formatted credentials in the mimir namespace.
     # When set alongside auth.jwt.providers, routes accept either Basic Auth or JWT.
     secretName: ""
+  # -- Paths exposed on the Mimir read route. Each path is matched with PathPrefix.
+  readPaths:
+  - /prometheus/api/v1/labels
+  - /prometheus/api/v1/label
+  - /prometheus/api/v1/rules
+  - /prometheus/api/v1/query
+  - /prometheus/api/v1/query_exemplars
+  - /prometheus/api/v1/query_range
+  - /prometheus/api/v1/status
+  - /prometheus/api/v1/metadata
+  - /prometheus/api/v1/detected_labels
+  # -- Paths forwarded to Mimir with the /prometheus prefix stripped (e.g. /prometheus/api/v1/push → /api/v1/push).
+  writeRewritePaths:
+  - /prometheus/api/v1/push
+  # -- Paths forwarded to Mimir as-is (no rewrite). Used for OTLP ingestion.
+  writePassthroughPaths:
+  - /otlp/v1/metrics
 
 tempo:
   enabled: false
@@ -57,6 +88,19 @@ tempo:
     # -- Name of a Kubernetes Secret with .htpasswd-formatted credentials in the tempo namespace.
     # When set alongside auth.jwt.providers, routes accept either Basic Auth or JWT.
     secretName: ""
+  # -- Paths exposed on the Tempo read route. Each path is matched with PathPrefix and forwarded
+  # with the /tempo prefix stripped (e.g. /tempo/api/echo → /api/echo).
+  readPaths:
+  - /tempo/api/echo
+  - /tempo/api/status/buildinfo
+  - /tempo/api/metrics/query_range
+  - /tempo/api/search
+  - /tempo/api/v2/search
+  - /tempo/api/traces
+  - /tempo/api/v2/traces
+  # -- Paths exposed on the Tempo OTLP write route. Each path is matched with PathPrefix and forwarded as-is.
+  writePaths:
+  - /v1/traces
 
 ingresses:
   - name: loki

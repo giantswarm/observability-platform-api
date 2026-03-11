@@ -1,0 +1,70 @@
+{{/*
+Mimir read API routes (mimir.enabled=true)
+
+Resources:
+  - HTTPRoute: routes read requests to mimir-gateway:80 in mimir.namespace.
+    Rule 1: matches path + X-Scope-OrgID header (regex ^.+$) → forwards to backend.
+    Rule 2: matches path only (no header) → returns 401 via HTTPRouteFilter.
+
+Exposed paths (configured via mimir.readPaths):
+  /prometheus/api/v1/labels, /prometheus/api/v1/label, /prometheus/api/v1/rules,
+  /prometheus/api/v1/query, /prometheus/api/v1/query_range,
+  /prometheus/api/v1/query_exemplars, /prometheus/api/v1/status,
+  /prometheus/api/v1/metadata, /prometheus/api/v1/detected_labels
+*/}}
+{{- if and .Values.mimir.enabled (or .Values.auth.jwt.providers .Values.mimir.basicAuth.secretName) -}}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "resource.default.name" . }}-mimir-read-api
+  namespace: {{ .Values.mimir.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  {{- with .Values.mimir.parentRefs }}
+  parentRefs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.mimir.hostname }}
+  hostnames:
+  - {{ tpl . $ | quote }}
+  {{- end }}
+  rules:
+  - backendRefs:
+    - name: mimir-gateway
+      namespace: {{ .Values.mimir.namespace }}
+      port: 80
+    matches:
+    {{- range .Values.mimir.readPaths }}
+    - path:
+        type: PathPrefix
+        value: {{ . }}
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    {{- end }}
+    filters:
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set:
+        - name: X-Scope-OrgID
+          value: "%REQ(X-Scope-OrgID)%"
+  - backendRefs:
+    - name: mimir-gateway
+      namespace: {{ .Values.mimir.namespace }}
+      port: 80
+    filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: {{ include "resource.default.name" . }}-mimir-headers-check
+    matches:
+    {{- range .Values.mimir.readPaths }}
+    - path:
+        type: PathPrefix
+        value: {{ . }}
+    {{- end }}
+{{- end }}

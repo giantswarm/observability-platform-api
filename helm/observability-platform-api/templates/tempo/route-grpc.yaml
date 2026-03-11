@@ -1,0 +1,51 @@
+{{/*
+Tempo gRPC read route (tempo.enabled=true)
+
+Resources:
+  - GRPCRoute (tempo-read-api-grpc): routes gRPC requests to tempo-query-frontend:9095.
+    Single rule: matches tempopb.* service + X-Scope-OrgID header → forwards to backend.
+    Requests missing X-Scope-OrgID do not match and are rejected by Envoy (no route match).
+    Note: GRPCRoute does not support HTTPRouteFilter ExtensionRef, so a directResponse
+    rule cannot be used; missing-header requests get a non-401 rejection instead.
+
+Exposed gRPC path:
+  any service matching regex "tempopb\.[^/]+"  (e.g. tempopb.StreamingQuerier, tempopb.Querier)
+*/}}
+{{- if and .Values.tempo.enabled (or .Values.auth.jwt.providers .Values.tempo.basicAuth.secretName) -}}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo-read-api-grpc
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  {{- with .Values.tempo.parentRefs }}
+  parentRefs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.tempo.hostname }}
+  hostnames:
+  - {{ tpl . $ | quote }}
+  {{- end }}
+  rules:
+  - backendRefs:
+    - name: tempo-query-frontend
+      namespace: {{ .Values.tempo.namespace }}
+      port: 9095
+    matches:
+    - method:
+        service: "tempopb\\.[^/]+"
+        type: RegularExpression
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    filters:
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set:
+        - name: X-Scope-OrgID
+          value: "%REQ(X-Scope-OrgID)%"
+{{- end }}

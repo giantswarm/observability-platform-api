@@ -1,0 +1,24 @@
+{{/*
+Loki HTTPRouteFilters (loki.enabled=true)
+
+Resources:
+  - HTTPRouteFilter (loki-headers-check): returns 401 when X-Scope-OrgID header is missing.
+    Shared by both loki-read-api and loki-write-api HTTPRoutes.
+*/}}
+{{- if and .Values.loki.enabled (or .Values.auth.jwt.providers .Values.loki.basicAuth.secretName) -}}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: HTTPRouteFilter
+metadata:
+  name: {{ include "resource.default.name" . }}-loki-headers-check
+  namespace: {{ .Values.loki.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  directResponse:
+    contentType: text/plain
+    statusCode: 401
+    body:
+      type: Inline
+      inline: "Bad Request"
+{{- end }}

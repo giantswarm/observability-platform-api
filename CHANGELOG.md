@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add Basic Auth support to all Gateway API routes via `<service>.basicAuth.secretName` (per service: `loki`, `mimir`, `tempo`).
   Routes now accept either `Authorization: Basic` or `Authorization: Bearer` credentials — configurable independently per service namespace.
+- Add configurable path lists to `values.yaml` (`loki.readPaths`, `loki.writePaths`, `mimir.readPaths`, `mimir.writeRewritePaths`, `mimir.writePassthroughPaths`, `tempo.readPaths`, `tempo.writePaths`).
+  Exposed API paths are now user-configurable and rendered via `range` loops, reducing template duplication.
+
+### Changed
+
+- Restructure Helm templates into per-service subdirectories (`templates/loki/`, `templates/mimir/`, `templates/tempo/`).
+- Consolidate per-route `SecurityPolicy` resources: Loki and Mimir now use a single `SecurityPolicy` per service (covering both read and write routes). Tempo retains separate policies due to the distinct GRPCRoute.
+- Share `HTTPRouteFilter` resources within each service: a single `headers-check` filter and (for Mimir/Tempo) a single `rewrite` filter are now referenced by all routes in that service namespace.
 
 ## [0.3.0] - 2026-03-11
 

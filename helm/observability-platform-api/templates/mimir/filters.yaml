@@ -1,0 +1,41 @@
+{{/*
+Mimir HTTPRouteFilters (mimir.enabled=true)
+
+Resources:
+  - HTTPRouteFilter (mimir-headers-check): returns 401 when X-Scope-OrgID header is missing.
+    Shared by both mimir-read-api and mimir-write-api HTTPRoutes.
+  - HTTPRouteFilter (mimir-rewrite): strips the /prometheus prefix before forwarding to backend
+    (/prometheus/api/v1/push → /api/v1/push).
+*/}}
+{{- if and .Values.mimir.enabled (or .Values.auth.jwt.providers .Values.mimir.basicAuth.secretName) -}}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: HTTPRouteFilter
+metadata:
+  name: {{ include "resource.default.name" . }}-mimir-headers-check
+  namespace: {{ .Values.mimir.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  directResponse:
+    contentType: text/plain
+    statusCode: 401
+    body:
+      type: Inline
+      inline: "Bad Request"
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: HTTPRouteFilter
+metadata:
+  name: {{ include "resource.default.name" . }}-mimir-rewrite
+  namespace: {{ .Values.mimir.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  urlRewrite:
+    path:
+      type: ReplaceRegexMatch
+      replaceRegexMatch:
+        pattern: "^/prometheus(/.*)$"
+        substitution: "\\1"
+{{- end }}

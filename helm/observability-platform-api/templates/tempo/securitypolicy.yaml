@@ -1,0 +1,79 @@
+{{/*
+Tempo SecurityPolicies (tempo.enabled=true)
+
+Resources:
+  - SecurityPolicy (tempo-read-api): enforces JWT and/or Basic Auth on the tempo-read-api HTTPRoute.
+  - SecurityPolicy (tempo-read-api-grpc): enforces JWT and/or Basic Auth on the tempo-read-api-grpc GRPCRoute.
+  - SecurityPolicy (tempo-otlp-write-api): enforces JWT and/or Basic Auth on the tempo-otlp-write-api HTTPRoute.
+*/}}
+{{- if and .Values.tempo.enabled (or .Values.auth.jwt.providers .Values.tempo.basicAuth.secretName) -}}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo-read-api
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ include "resource.default.name" . }}-tempo-read-api
+  {{- if .Values.auth.jwt.providers }}
+  jwt:
+    providers:
+      {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
+  {{- end }}
+  {{- if .Values.tempo.basicAuth.secretName }}
+  basicAuth:
+    users:
+      name: {{ .Values.tempo.basicAuth.secretName }}
+  {{- end }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo-read-api-grpc
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: GRPCRoute
+    name: {{ include "resource.default.name" . }}-tempo-read-api-grpc
+  {{- if .Values.auth.jwt.providers }}
+  jwt:
+    providers:
+      {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
+  {{- end }}
+  {{- if .Values.tempo.basicAuth.secretName }}
+  basicAuth:
+    users:
+      name: {{ .Values.tempo.basicAuth.secretName }}
+  {{- end }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo-otlp-write-api
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ include "resource.default.name" . }}-tempo-otlp-write-api
+  {{- if .Values.auth.jwt.providers }}
+  jwt:
+    providers:
+      {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
+  {{- end }}
+  {{- if .Values.tempo.basicAuth.secretName }}
+  basicAuth:
+    users:
+      name: {{ .Values.tempo.basicAuth.secretName }}
+  {{- end }}
+{{- end }}

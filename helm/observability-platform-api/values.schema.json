@@ -26,6 +26,16 @@
                             "description": "Name of the .htpasswd Secret in the loki namespace."
                         }
                     }
+                },
+                "readPaths": {
+                    "type": "array",
+                    "description": "Paths exposed on the Loki read route, matched with PathPrefix.",
+                    "items": { "type": "string" }
+                },
+                "writePaths": {
+                    "type": "array",
+                    "description": "Paths exposed on the Loki write route, forwarded as-is.",
+                    "items": { "type": "string" }
                 }
             }
         },
@@ -53,6 +63,21 @@
                             "description": "Name of the .htpasswd Secret in the mimir namespace."
                         }
                     }
+                },
+                "readPaths": {
+                    "type": "array",
+                    "description": "Paths exposed on the Mimir read route, matched with PathPrefix.",
+                    "items": { "type": "string" }
+                },
+                "writeRewritePaths": {
+                    "type": "array",
+                    "description": "Paths forwarded to Mimir with the /prometheus prefix stripped.",
+                    "items": { "type": "string" }
+                },
+                "writePassthroughPaths": {
+                    "type": "array",
+                    "description": "Paths forwarded to Mimir as-is (no rewrite). Used for OTLP ingestion.",
+                    "items": { "type": "string" }
                 }
             }
         },
@@ -80,6 +105,16 @@
                             "description": "Name of the .htpasswd Secret in the tempo namespace."
                         }
                     }
+                },
+                "readPaths": {
+                    "type": "array",
+                    "description": "Paths exposed on the Tempo read route, forwarded with the /tempo prefix stripped.",
+                    "items": { "type": "string" }
+                },
+                "writePaths": {
+                    "type": "array",
+                    "description": "Paths exposed on the Tempo OTLP write route, forwarded as-is.",
+                    "items": { "type": "string" }
                 }
             }
         },
