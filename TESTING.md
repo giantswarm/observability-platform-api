@@ -38,7 +38,7 @@ helm template observability-platform-api ./helm/observability-platform-api \
 
 ### What happens when auth is not configured?
 
-Each route template renders only when the service is enabled **and** at least one auth method is configured for that service.
+Each route template renders only when the service is enabled **and** `auth.jwt.providers` is configured.
 
 | Services enabled | `auth.jwt.providers` | Result |
 |-----------------|---------------------|--------|
