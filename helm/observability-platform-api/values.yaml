@@ -14,10 +14,21 @@ auth:
     #   issuer: "https://dex.mycluster.example.com"
     #   remoteJWKS:
     #     uri: "https://dex.mycluster.example.com/keys"
+    #   # Best practice: restrict JWT extraction to Bearer tokens only.
+    #   # This prevents the JWT filter from attempting to parse Basic Auth credentials
+    #   # as a JWT when both auth methods are enabled on the same route.
+    #   extractFrom:
+    #     headers:
+    #     - name: Authorization
+    #       valuePrefix: "Bearer "
     # - name: azure-ad
     #   issuer: "https://login.microsoftonline.com/<tenant-id>/v2.0"
     #   remoteJWKS:
     #     uri: "https://login.microsoftonline.com/<tenant-id>/discovery/v2.0/keys"
+    #   extractFrom:
+    #     headers:
+    #     - name: Authorization
+    #       valuePrefix: "Bearer "
 
 loki:
   enabled: false
@@ -56,10 +67,11 @@ loki:
     # -- Paths whose leading prefix is stripped before forwarding (e.g. /loki/api/v1/push → /api/v1/push).
     # Leave empty for Loki — loki-gateway handles the /loki prefix natively.
     stripPrefixPaths: []
-    # -- gRPC OTLP ingestion. Routes directly to loki-distributor (bypasses the nginx gateway,
-    # which does not handle gRPC). Set backendService/backendPort to enable.
+    # -- gRPC OTLP ingestion. Routes directly to the Loki write component (bypasses the nginx
+    # gateway, which does not handle gRPC). Set backendService/backendPort to enable.
+    # Use loki-write for SimpleScalable mode (default); loki-distributor for microservices mode.
     grpc:
-      backendService: loki-distributor
+      backendService: loki-write
       backendPort: 9095
 
 mimir:

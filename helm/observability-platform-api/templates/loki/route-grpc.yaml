@@ -9,8 +9,9 @@ Resources:
     Note: GRPCRoute does not support HTTPRouteFilter ExtensionRef, so a directResponse
     rule cannot be used; missing-header requests get a non-401 rejection instead.
 
-    The route targets loki-distributor directly (not loki-gateway) because the nginx gateway
-    does not handle gRPC traffic.
+    The route targets the Loki write component directly (not loki-gateway) because the nginx
+    gateway does not handle gRPC traffic. In SimpleScalable mode this is loki-write; in
+    microservices mode this is loki-distributor.
 
 Exposed gRPC service:
   opentelemetry.proto.collector.logs.v1.LogsService  (OTLP log ingestion)

@@ -23,6 +23,9 @@ spec:
     name: {{ include "resource.default.name" . }}-tempo-read-api
   {{- if .Values.auth.jwt.providers }}
   jwt:
+    {{- if .Values.tempo.basicAuth.secretName }}
+    optional: true
+    {{- end }}
     providers:
       {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
   {{- end }}
@@ -46,6 +49,9 @@ spec:
     name: {{ include "resource.default.name" . }}-tempo-read-api-grpc
   {{- if .Values.auth.jwt.providers }}
   jwt:
+    {{- if .Values.tempo.basicAuth.secretName }}
+    optional: true
+    {{- end }}
     providers:
       {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
   {{- end }}
@@ -69,6 +75,9 @@ spec:
     name: {{ include "resource.default.name" . }}-tempo-otlp-write-api
   {{- if .Values.auth.jwt.providers }}
   jwt:
+    {{- if .Values.tempo.basicAuth.secretName }}
+    optional: true
+    {{- end }}
     providers:
       {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
   {{- end }}
@@ -92,6 +101,9 @@ spec:
     name: {{ include "resource.default.name" . }}-tempo-write-api-grpc
   {{- if .Values.auth.jwt.providers }}
   jwt:
+    {{- if .Values.tempo.basicAuth.secretName }}
+    optional: true
+    {{- end }}
     providers:
       {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
   {{- end }}

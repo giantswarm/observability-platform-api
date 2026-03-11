@@ -23,6 +23,9 @@ spec:
     name: {{ include "resource.default.name" . }}-mimir-write-api
   {{- if .Values.auth.jwt.providers }}
   jwt:
+    {{- if .Values.mimir.basicAuth.secretName }}
+    optional: true
+    {{- end }}
     providers:
       {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
   {{- end }}

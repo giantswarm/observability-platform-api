@@ -127,7 +127,7 @@ GRPC_HOST="${BASE#https://}"
 # For Basic Auth testing — username is the MC name, password from section 2b above
 BASIC_USER="<mc-name>"  # e.g. graveler
 BASIC_PASS="<password from org-giantswarm secret>"
-BASIC_AUTH="Authorization: Basic $(echo -n "$BASIC_USER:$BASIC_PASS" | base64)"
+BASIC_AUTH="Authorization: Basic $(echo -n "$BASIC_USER:$BASIC_PASS" | base64 -w0)"
 ```
 
 ## 4. Test all paths

@@ -25,7 +25,7 @@ loki:
     - /otlp/v1/logs
     stripPrefixPaths: []
     grpc:
-      backendService: loki-distributor
+      backendService: loki-write
       backendPort: 9095
 
 mimir:
@@ -67,3 +67,6 @@ tempo:
     paths:
     - /v1/traces
     stripPrefixPaths: []
+    grpc:
+      backendService: tempo-distributor
+      backendPort: 4317

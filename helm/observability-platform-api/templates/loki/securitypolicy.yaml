@@ -26,6 +26,9 @@ spec:
     name: {{ include "resource.default.name" . }}-loki-write-api-grpc
   {{- if .Values.auth.jwt.providers }}
   jwt:
+    {{- if .Values.loki.basicAuth.secretName }}
+    optional: true
+    {{- end }}
     providers:
       {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
   {{- end }}
