@@ -122,6 +122,11 @@ tempo:
     - /v1/traces
     # -- No prefix stripping needed for Tempo write paths.
     stripPrefixPaths: []
+    # -- gRPC OTLP trace ingestion. Routes directly to tempo-distributor:4317 (bypasses the nginx
+    # gateway, which does not handle gRPC). Set backendService/backendPort to enable.
+    grpc:
+      backendService: tempo-distributor
+      backendPort: 4317
 
 ingresses:
   - name: loki

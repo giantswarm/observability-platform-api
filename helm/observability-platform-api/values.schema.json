@@ -131,7 +131,14 @@
                     "type": "object",
                     "properties": {
                         "paths": { "type": "array", "items": { "type": "string" } },
-                        "stripPrefixPaths": { "type": "array", "items": { "type": "string" } }
+                        "stripPrefixPaths": { "type": "array", "items": { "type": "string" } },
+                        "grpc": {
+                            "type": "object",
+                            "properties": {
+                                "backendService": { "type": "string" },
+                                "backendPort": { "type": "integer" }
+                            }
+                        }
                     }
                 }
             }

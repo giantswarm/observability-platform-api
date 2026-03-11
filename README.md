@@ -73,7 +73,8 @@ The observability-platform-api creates `HTTPRoute` and `GRPCRoute` resources und
 │             │ ├── /tempopb.StreamingQuerier.SearchTagsV2                   │                                  │               │
 │             │ ├── /tempopb.StreamingQuerier.MetricsQueryRange              │                                  │               │
 │             │ └── ...                                                      │                                  │               │
-│ HTTPS       │ /v1/traces                                                   │ OpenTelemetry Traces / Tempo     │ Write         │
+│ HTTPS       │ /v1/traces                                                   │ Traces / Tempo (OTLP HTTP)       │ Write         │
+│ gRPC (+TLS) │ opentelemetry.proto.collector.trace.v1.TraceService          │ Traces / Tempo (OTLP gRPC)       │ Write         │
 └─────────────┴──────────────────────────────────────────────────────────────┴──────────────────────────────────┴───────────────┘
 ```
 
@@ -145,8 +146,8 @@ This app creates multiple `HTTPRoute` and `GRPCRoute` resources (one per service
 **Template structure** — templates are organised per service under `templates/loki/`, `templates/mimir/`, and `templates/tempo/`. Each directory contains:
 - `route-read.yaml` — HTTP read `HTTPRoute`
 - `route-write.yaml` — HTTP write `HTTPRoute`
-- `route-grpc.yaml` — gRPC `GRPCRoute` (Loki write OTLP / Tempo read)
-- `securitypolicy.yaml` — one `SecurityPolicy` per service (covers all routes in that namespace)
+- `route-grpc.yaml` — gRPC `GRPCRoute`(s): Loki OTLP write; Tempo read + OTLP write
+- `securitypolicy.yaml` — one `SecurityPolicy` per route for Loki and Mimir (single SP covers all HTTP routes); Tempo requires one SP per route because each `GRPCRoute` must have its own `SecurityPolicy`
 - `filters.yaml` — shared `HTTPRouteFilter` resources (headers-check and path rewrite where applicable)
 
 **Operational Considerations:**

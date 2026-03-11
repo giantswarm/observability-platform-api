@@ -322,7 +322,7 @@ curl -si --http2 -X POST "https://$GRPC_HOST/tempopb.StreamingQuerier/SearchTags
 
 ### Tempo OTLP write
 
-Backend: `tempo-distributor:4318`. OTLP HTTP only — no gRPC write route (matches old NGINX config).
+Backend: `tempo-distributor:4318`. OTLP HTTP trace ingestion.
 
 ```bash
 curl -si -X POST "$BASE/v1/traces" \
@@ -338,6 +338,28 @@ curl -si -X POST "$BASE/v1/traces" \
 curl -si -X POST "$BASE/v1/traces" \
   -H "$SCOPE" -H "Content-Type: application/json" -d '{}'
 # expect: 401
+```
+
+### Tempo write — gRPC OTLP
+
+Backend: `tempo-distributor:4317`. Separate `GRPCRoute` — routes directly to `tempo-distributor` (nginx does not handle gRPC).
+
+> **Note on missing `X-Scope-OrgID`**: `GRPCRoute` does not support `HTTPRouteFilter` via `ExtensionRef`, so requests missing `X-Scope-OrgID` get a no-route rejection rather than a strict 401.
+
+```bash
+# With auth and X-Scope-OrgID — reaches backend
+grpcurl -H "Authorization: Bearer $TOKEN" \
+  -H "X-Scope-OrgID: $ORG" \
+  "$GRPC_HOST:443" \
+  opentelemetry.proto.collector.trace.v1.TraceService/Export
+# expect: response from tempo-distributor (grpc-status: 0 or similar — not 16)
+
+# No JWT — SecurityPolicy returns grpc-status: 16 (UNAUTHENTICATED)
+curl -si --http2 -X POST "https://$GRPC_HOST/opentelemetry.proto.collector.trace.v1.TraceService/Export" \
+  -H "X-Scope-OrgID: $ORG" \
+  -H "Content-Type: application/grpc" \
+  --data-binary $'\x00\x00\x00\x00\x00'
+# expect: grpc-status: 16
 ```
 
 ## 5. Verify SecurityPolicy status in-cluster
@@ -356,7 +378,8 @@ for NS_NAME in \
   "mimir/$RELEASE-mimir" \
   "tempo/$RELEASE-tempo-read-api" \
   "tempo/$RELEASE-tempo-read-api-grpc" \
-  "tempo/$RELEASE-tempo-otlp-write-api"; do
+  "tempo/$RELEASE-tempo-otlp-write-api" \
+  "tempo/$RELEASE-tempo-write-api-grpc"; do
   NS=$(echo $NS_NAME | cut -d/ -f1)
   NAME=$(echo $NS_NAME | cut -d/ -f2)
   STATUS=$(kubectl get securitypolicy -n $NS $NAME -o json 2>/dev/null \
