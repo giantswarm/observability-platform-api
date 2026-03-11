@@ -11,18 +11,18 @@ This document describes how to configure and test all exposed routes (Loki, Mimi
 
 ## 1. Helm template check
 
-Before deploying, verify the rendered output has no stale `extAuth` references and that `jwt.providers` is rendered correctly:
+Before deploying, verify the rendered output has no stale `extAuth` references and that auth blocks are rendered correctly:
 
 ```bash
 helm template observability-platform-api \
   ./helm/observability-platform-api \
   -f helm/observability-platform-api/ci/test-values.yaml
 
-# Confirm jwt: blocks are present, no extAuth: blocks
+# Confirm jwt: and basicAuth: blocks are present in SecurityPolicy, no extAuth: blocks
 helm template observability-platform-api \
   ./helm/observability-platform-api \
   -f helm/observability-platform-api/ci/test-values.yaml \
-  | grep -A8 'kind: SecurityPolicy'
+  | grep -A12 'kind: SecurityPolicy'
 
 helm template observability-platform-api \
   ./helm/observability-platform-api \
@@ -30,22 +30,30 @@ helm template observability-platform-api \
   | grep -c extAuth
 # expect: 0
 
-# Verify that enabling a service with no providers renders nothing (no routes created)
+# Verify that enabling a service with no auth configured renders nothing (no routes created)
 helm template observability-platform-api ./helm/observability-platform-api \
   --set loki.enabled=true | grep -c 'kind:'
 # expect: 0
+
+# Verify basicAuth-only rendering (no JWT providers)
+helm template observability-platform-api ./helm/observability-platform-api \
+  --set loki.enabled=true \
+  --set loki.basicAuth.secretName=loki-basic-auth \
+  | grep -A6 'kind: SecurityPolicy'
+# expect: SecurityPolicy with only basicAuth: block (no jwt: block)
 ```
 
-### What happens when `auth.jwt.providers` is empty?
+### What happens when auth is not configured?
 
-Each route template uses `{{- if and .Values.<service>.enabled .Values.auth.jwt.providers -}}`,
-so resources are only rendered when both the service is enabled and providers are configured.
+Each route template renders only when the service is enabled **and** at least one auth method is configured for that service.
 
-| Services enabled | `auth.jwt.providers` | Result |
-|-----------------|---------------------|--------|
-| All false (default) | `[]` | Chart renders fine (no routes created) |
-| Any true | `[]` | Chart renders fine (no routes created) |
-| Any true | populated | Chart renders correctly |
+| Services enabled | `auth.jwt.providers` | `<svc>.basicAuth.secretName` | Result |
+|-----------------|---------------------|-------------------------------------|--------|
+| All false (default) | `[]` | `""` | Chart renders fine (no routes created) |
+| Any true | `[]` | `""` | Chart renders fine (no routes created) |
+| Any true | populated | `""` | Routes rendered with JWT only |
+| Any true | `[]` | set | Routes rendered with Basic Auth only |
+| Any true | populated | set | Routes rendered with both JWT and Basic Auth |
 
 ## 2. Get a test token
 
@@ -92,17 +100,23 @@ BASE="https://observability.<codename>.<base-domain>"
 ORG="my-tenant"
 AUTH="Authorization: Bearer $TOKEN"
 SCOPE="X-Scope-OrgID: $ORG"
+
+# For Basic Auth testing (replace with actual credentials from the .htpasswd secret)
+BASIC_USER="myuser"
+BASIC_PASS="mypassword"
+BASIC_AUTH="Authorization: Basic $(echo -n "$BASIC_USER:$BASIC_PASS" | base64)"
 ```
 
 ## 4. Test all paths
 
-For every path, three scenarios are validated:
+For every path, the following scenarios are validated:
 
 | Scenario | Expected (HTTP) | Expected (gRPC) |
 |----------|----------------|-----------------|
 | Valid JWT + `X-Scope-OrgID` present | 2xx (backend response) | grpc-status: 12 (backend reached) |
+| Valid Basic Auth + `X-Scope-OrgID` present | 2xx (backend response) | grpc-status: 12 (backend reached) |
 | Valid JWT, `X-Scope-OrgID` missing | 401 | no-route rejection (not a strict 401) |
-| No JWT | 401 | grpc-status: 16 (UNAUTHENTICATED) |
+| No auth credential | 401 | grpc-status: 16 (UNAUTHENTICATED) |
 
 ### Loki read
 
@@ -110,9 +124,10 @@ Backend: `loki-gateway:80`. No path rewrite.
 
 ```bash
 # Full auth scenario test on representative path
-curl -si "$BASE/loki/api/v1/labels" -H "$AUTH" -H "$SCOPE"  # expect 2xx
-curl -si "$BASE/loki/api/v1/labels" -H "$AUTH"               # expect 401
-curl -si "$BASE/loki/api/v1/labels" -H "$SCOPE"              # expect 401
+curl -si "$BASE/loki/api/v1/labels" -H "$AUTH" -H "$SCOPE"        # expect 2xx (JWT)
+curl -si "$BASE/loki/api/v1/labels" -H "$BASIC_AUTH" -H "$SCOPE"  # expect 2xx (Basic Auth)
+curl -si "$BASE/loki/api/v1/labels" -H "$AUTH"                     # expect 401
+curl -si "$BASE/loki/api/v1/labels" -H "$SCOPE"                    # expect 401
 
 # Smoke test all paths (valid auth)
 for p in \
@@ -139,7 +154,11 @@ PAYLOAD='{"streams":[{"stream":{"job":"test"},"values":[["'"$(date +%s%N)"'","te
 
 curl -si -X POST "$BASE/loki/api/v1/push" \
   -H "$AUTH" -H "$SCOPE" -H "Content-Type: application/json" -d "$PAYLOAD"
-# expect: 204
+# expect: 204 (JWT)
+
+curl -si -X POST "$BASE/loki/api/v1/push" \
+  -H "$BASIC_AUTH" -H "$SCOPE" -H "Content-Type: application/json" -d "$PAYLOAD"
+# expect: 204 (Basic Auth)
 
 curl -si -X POST "$BASE/loki/api/v1/push" \
   -H "$AUTH" -H "Content-Type: application/json" -d "$PAYLOAD"
@@ -147,7 +166,7 @@ curl -si -X POST "$BASE/loki/api/v1/push" \
 
 curl -si -X POST "$BASE/loki/api/v1/push" \
   -H "$SCOPE" -H "Content-Type: application/json" -d "$PAYLOAD"
-# expect: 401 (missing JWT)
+# expect: 401 (no auth credential)
 ```
 
 ### Mimir read
@@ -155,9 +174,10 @@ curl -si -X POST "$BASE/loki/api/v1/push" \
 Backend: `mimir-gateway:80`. No path rewrite.
 
 ```bash
-curl -si "$BASE/prometheus/api/v1/labels" -H "$AUTH" -H "$SCOPE"  # expect 2xx
-curl -si "$BASE/prometheus/api/v1/labels" -H "$AUTH"               # expect 401
-curl -si "$BASE/prometheus/api/v1/labels" -H "$SCOPE"              # expect 401
+curl -si "$BASE/prometheus/api/v1/labels" -H "$AUTH" -H "$SCOPE"        # expect 2xx (JWT)
+curl -si "$BASE/prometheus/api/v1/labels" -H "$BASIC_AUTH" -H "$SCOPE"  # expect 2xx (Basic Auth)
+curl -si "$BASE/prometheus/api/v1/labels" -H "$AUTH"                     # expect 401
+curl -si "$BASE/prometheus/api/v1/labels" -H "$SCOPE"                    # expect 401
 
 for p in \
   /prometheus/api/v1/label/__name__/values \
@@ -193,9 +213,10 @@ curl -si -X POST "$BASE/prometheus/api/v1/push" -H "$SCOPE"  # expect 401
 Backend: `tempo-query-frontend:3200`. Path rewrite: `/tempo` prefix stripped before forwarding.
 
 ```bash
-curl -si "$BASE/tempo/api/echo" -H "$AUTH" -H "$SCOPE"  # expect 200, body: "echo"
-curl -si "$BASE/tempo/api/echo" -H "$AUTH"               # expect 401
-curl -si "$BASE/tempo/api/echo" -H "$SCOPE"              # expect 401
+curl -si "$BASE/tempo/api/echo" -H "$AUTH" -H "$SCOPE"        # expect 200, body: "echo" (JWT)
+curl -si "$BASE/tempo/api/echo" -H "$BASIC_AUTH" -H "$SCOPE"  # expect 200, body: "echo" (Basic Auth)
+curl -si "$BASE/tempo/api/echo" -H "$AUTH"                     # expect 401
+curl -si "$BASE/tempo/api/echo" -H "$SCOPE"                    # expect 401
 
 for p in \
   /tempo/api/status/buildinfo \

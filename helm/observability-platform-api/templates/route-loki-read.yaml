@@ -5,7 +5,7 @@ Resources:
   - HTTPRoute: routes read requests to loki-gateway:80 in loki.namespace.
     Rule 1: matches path + X-Scope-OrgID header (regex ^.+$) → forwards to backend.
     Rule 2: matches path only (no header) → returns 401 via HTTPRouteFilter.
-  - SecurityPolicy: enforces JWT validation using auth.jwt.providers.
+  - SecurityPolicy: enforces JWT and/or Basic Auth via auth.jwt.providers and loki.basicAuth.secretName.
   - HTTPRouteFilter: returns 401 when X-Scope-OrgID header is missing.
 
 Exposed paths:
@@ -13,7 +13,7 @@ Exposed paths:
   /loki/api/v1/query, /loki/api/v1/query_range, /loki/api/v1/index,
   /loki/api/v1/series, /loki/api/v1/detected_labels
 */}}
-{{- if and .Values.loki.enabled .Values.auth.jwt.providers -}}
+{{- if and .Values.loki.enabled (or .Values.auth.jwt.providers .Values.loki.basicAuth.secretName) -}}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -147,9 +147,16 @@ spec:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: {{ include "resource.default.name" . }}-loki-read-api
+  {{- if .Values.auth.jwt.providers }}
   jwt:
     providers:
       {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
+  {{- end }}
+  {{- if .Values.loki.basicAuth.secretName }}
+  basicAuth:
+    users:
+      name: {{ .Values.loki.basicAuth.secretName }}
+  {{- end }}
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: HTTPRouteFilter

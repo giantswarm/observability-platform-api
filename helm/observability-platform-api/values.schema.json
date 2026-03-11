@@ -16,6 +16,16 @@
                 },
                 "parentRefs": {
                     "type": "array"
+                },
+                "basicAuth": {
+                    "type": "object",
+                    "description": "Basic Auth config for Loki routes. When set alongside JWT, routes accept either credential type.",
+                    "properties": {
+                        "secretName": {
+                            "type": "string",
+                            "description": "Name of the .htpasswd Secret in the loki namespace."
+                        }
+                    }
                 }
             }
         },
@@ -33,6 +43,16 @@
                 },
                 "parentRefs": {
                     "type": "array"
+                },
+                "basicAuth": {
+                    "type": "object",
+                    "description": "Basic Auth config for Mimir routes. When set alongside JWT, routes accept either credential type.",
+                    "properties": {
+                        "secretName": {
+                            "type": "string",
+                            "description": "Name of the .htpasswd Secret in the mimir namespace."
+                        }
+                    }
                 }
             }
         },
@@ -50,6 +70,16 @@
                 },
                 "parentRefs": {
                     "type": "array"
+                },
+                "basicAuth": {
+                    "type": "object",
+                    "description": "Basic Auth config for Tempo routes. When set alongside JWT, routes accept either credential type.",
+                    "properties": {
+                        "secretName": {
+                            "type": "string",
+                            "description": "Name of the .htpasswd Secret in the tempo namespace."
+                        }
+                    }
                 }
             }
         },

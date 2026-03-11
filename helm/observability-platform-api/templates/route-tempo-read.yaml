@@ -5,7 +5,7 @@ Resources (HTTP):
   - HTTPRoute (tempo-read-api): routes read requests to tempo-query-frontend:3200.
     Rule 1: matches path + X-Scope-OrgID header → strips /tempo prefix and forwards.
     Rule 2: matches path only (no header) → returns 401 via HTTPRouteFilter.
-  - SecurityPolicy: enforces JWT validation using auth.jwt.providers.
+  - SecurityPolicy: enforces JWT and/or Basic Auth via auth.jwt.providers and tempo.basicAuth.secretName.
   - HTTPRouteFilter (rewrite): strips the /tempo prefix before forwarding
     (/tempo/api/... → /api/...).
   - HTTPRouteFilter (headers-check): returns 401 when X-Scope-OrgID header is missing.
@@ -20,12 +20,12 @@ Resources (gRPC):
     Requests missing X-Scope-OrgID do not match and are rejected by Envoy (no route match).
     Note: GRPCRoute does not support HTTPRouteFilter ExtensionRef, so a directResponse
     rule cannot be used; missing-header requests get a non-401 rejection instead.
-  - SecurityPolicy: enforces JWT validation using auth.jwt.providers.
+  - SecurityPolicy: enforces JWT and/or Basic Auth via auth.jwt.providers and tempo.basicAuth.secretName.
 
 Exposed gRPC path:
   any service matching regex "tempopb\.[^/]+"  (e.g. tempopb.StreamingQuerier, tempopb.Querier)
 */}}
-{{- if and .Values.tempo.enabled .Values.auth.jwt.providers -}}
+{{- if and .Values.tempo.enabled (or .Values.auth.jwt.providers .Values.tempo.basicAuth.secretName) -}}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -154,9 +154,16 @@ spec:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: {{ include "resource.default.name" . }}-tempo-read-api
+  {{- if .Values.auth.jwt.providers }}
   jwt:
     providers:
       {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
+  {{- end }}
+  {{- if .Values.tempo.basicAuth.secretName }}
+  basicAuth:
+    users:
+      name: {{ .Values.tempo.basicAuth.secretName }}
+  {{- end }}
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: HTTPRouteFilter
@@ -236,7 +243,14 @@ spec:
   - group: gateway.networking.k8s.io
     kind: GRPCRoute
     name: {{ include "resource.default.name" . }}-tempo-read-api-grpc
+  {{- if .Values.auth.jwt.providers }}
   jwt:
     providers:
       {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
+  {{- end }}
+  {{- if .Values.tempo.basicAuth.secretName }}
+  basicAuth:
+    users:
+      name: {{ .Values.tempo.basicAuth.secretName }}
+  {{- end }}
 {{- end }}

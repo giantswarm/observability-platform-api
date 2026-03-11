@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add Basic Auth support to all Gateway API routes via `<service>.basicAuth.secretName` (per service: `loki`, `mimir`, `tempo`).
+  Routes now accept either `Authorization: Basic` or `Authorization: Bearer` credentials — configurable independently per service namespace.
+
 ## [0.3.0] - 2026-03-11
 
 ### Added

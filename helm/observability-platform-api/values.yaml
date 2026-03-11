@@ -27,6 +27,10 @@ loki:
   parentRefs:
   - name: giantswarm-default
     namespace: envoy-gateway-system
+  basicAuth:
+    # -- Name of a Kubernetes Secret with .htpasswd-formatted credentials in the loki namespace.
+    # When set alongside auth.jwt.providers, routes accept either Basic Auth or JWT.
+    secretName: ""
 
 mimir:
   enabled: false
@@ -36,6 +40,10 @@ mimir:
   parentRefs:
   - name: giantswarm-default
     namespace: envoy-gateway-system
+  basicAuth:
+    # -- Name of a Kubernetes Secret with .htpasswd-formatted credentials in the mimir namespace.
+    # When set alongside auth.jwt.providers, routes accept either Basic Auth or JWT.
+    secretName: ""
 
 tempo:
   enabled: false
@@ -45,6 +53,10 @@ tempo:
   parentRefs:
   - name: giantswarm-default
     namespace: envoy-gateway-system
+  basicAuth:
+    # -- Name of a Kubernetes Secret with .htpasswd-formatted credentials in the tempo namespace.
+    # When set alongside auth.jwt.providers, routes accept either Basic Auth or JWT.
+    secretName: ""
 
 ingresses:
   - name: loki

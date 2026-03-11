@@ -5,13 +5,13 @@ Resources:
   - HTTPRoute: routes OTLP trace ingestion to tempo-distributor:4318 in tempo.namespace.
     Rule 1: matches /v1/traces + X-Scope-OrgID header → forwards to backend.
     Rule 2: matches /v1/traces only (no header) → returns 401 via HTTPRouteFilter.
-  - SecurityPolicy: enforces JWT validation using auth.jwt.providers.
+  - SecurityPolicy: enforces JWT and/or Basic Auth via auth.jwt.providers and tempo.basicAuth.secretName.
   - HTTPRouteFilter: returns 401 when X-Scope-OrgID header is missing.
 
 Exposed paths:
   /v1/traces  (OTLP HTTP trace ingestion)
 */}}
-{{- if and .Values.tempo.enabled .Values.auth.jwt.providers -}}
+{{- if and .Values.tempo.enabled (or .Values.auth.jwt.providers .Values.tempo.basicAuth.secretName) -}}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -75,9 +75,16 @@ spec:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: {{ include "resource.default.name" . }}-tempo-otlp-write-api
+  {{- if .Values.auth.jwt.providers }}
   jwt:
     providers:
       {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
+  {{- end }}
+  {{- if .Values.tempo.basicAuth.secretName }}
+  basicAuth:
+    users:
+      name: {{ .Values.tempo.basicAuth.secretName }}
+  {{- end }}
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: HTTPRouteFilter

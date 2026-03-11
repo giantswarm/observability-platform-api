@@ -13,6 +13,8 @@ loki:
   parentRefs:
   - name: giantswarm-default
     namespace: envoy-gateway-system
+  basicAuth:
+    secretName: "loki-basic-auth"
 
 mimir:
   enabled: true
@@ -21,6 +23,8 @@ mimir:
   parentRefs:
   - name: giantswarm-default
     namespace: envoy-gateway-system
+  basicAuth:
+    secretName: "mimir-basic-auth"
 
 tempo:
   enabled: true
@@ -29,3 +33,5 @@ tempo:
   parentRefs:
   - name: giantswarm-default
     namespace: envoy-gateway-system
+  basicAuth:
+    secretName: "tempo-basic-auth"

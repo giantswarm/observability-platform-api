@@ -9,7 +9,7 @@ The **observability-platform-api** provides the external access layer for Giant 
 ### What this app is for:
 
 - **External API Access**: Secure HTTP/HTTPS endpoints for external systems to interact with observability services
-- **Authentication Gateway**: OIDC-based authentication and tenant routing for all external requests
+- **Authentication Gateway**: OIDC JWT and/or Basic Auth authentication and tenant routing for all external requests
 - **Multi-Service Routing**: Unified domain with path-based routing to different observability backends
 - **Access Control**: Enforcement of tenant isolation via Envoy Gateway `SecurityPolicy` for all external access
 
@@ -49,6 +49,7 @@ The observability-platform-api creates separate `HTTPRoute` resources under a un
 │             │ /loki/api/v1/rules                                           │                                  │               │
 │             │ /loki/api/v1/detected_labels                                 │                                  │               │
 │ HTTPS       │ /loki/api/v1/push                                            │ Logs / Loki                      │ Write         │
+│ HTTPS       │ /otlp/v1/logs                                                │ Logs / Loki (OTLP)               │ Write         │
 │ HTTPS       │ /prometheus/api/v1/query                                     │ Metrics / Mimir                  │ Read          │
 │             │ /prometheus/api/v1/query_range                               │                                  │               │
 │             │ /prometheus/api/v1/query_exemplars                           │                                  │               │
@@ -59,6 +60,7 @@ The observability-platform-api creates separate `HTTPRoute` resources under a un
 │             │ /prometheus/api/v1/metadata                                  │                                  │               │
 │             │ /prometheus/api/v1/detected_labels                           │                                  │               │
 │ HTTPS       │ /prometheus/api/v1/push  (rewritten → /api/v1/push)         │ Metrics / Mimir                  │ Write         │
+│ HTTPS       │ /otlp/v1/metrics                                             │ Metrics / Mimir (OTLP)           │ Write         │
 │ HTTPS       │ /tempo/api/echo                                              │ Traces / Tempo                   │ Read          │
 │             │ /tempo/api/status/buildinfo                                  │                                  │               │
 │             │ /tempo/api/metrics/query_range                               │                                  │               │
@@ -76,15 +78,13 @@ The observability-platform-api creates separate `HTTPRoute` resources under a un
 
 ### Authentication
 
-All routes (read and write) use Envoy Gateway's native JWT validation via `SecurityPolicy.jwt`. This validates Bearer tokens directly against the JWKS endpoint of each configured issuer, with no external auth service required.
-
-Multiple OIDC providers are supported — tokens from any configured issuer are accepted. This handles both human users (OIDC sessions via Dex, Azure AD, etc.) and applications (Azure AD service principals, any OIDC-compliant IdP).
+All routes (read and write) support two authentication methods via Envoy Gateway `SecurityPolicy` — JWT Bearer tokens and HTTP Basic Auth. They can be configured independently per service, and when both are set, routes accept either credential type (OR logic).
 
 All routes additionally enforce that the `X-Scope-OrgID` header is present and non-empty — requests missing it receive a `401`.
 
 #### Configuring JWT providers
 
-Set `auth.jwt.providers` to the list of trusted OIDC issuers. At least one provider is required when any service is enabled:
+Set `auth.jwt.providers` to the list of trusted OIDC issuers. JWT validation is done inline by Envoy Gateway against the issuer's JWKS endpoint — no external auth service required.
 
 ```yaml
 auth:
@@ -100,7 +100,34 @@ auth:
         uri: "https://login.microsoftonline.com/<tenant-id>/discovery/v2.0/keys"
 ```
 
-Each provider entry maps directly to an Envoy Gateway JWT provider. Tokens are validated against the issuer's JWKS endpoint; any token from a listed issuer is accepted. Helm template strings are supported in all fields.
+Multiple OIDC providers are supported — tokens from any configured issuer are accepted. This handles both human users (OIDC sessions via Dex, Azure AD, etc.) and applications (Azure AD service principals, any OIDC-compliant IdP). Helm template strings are supported in all fields.
+
+#### Configuring Basic Auth
+
+Set `<service>.basicAuth.secretName` to the name of a Kubernetes Secret in `.htpasswd` format, placed in the service's own namespace. Each service is configured independently since they live in different namespaces (`loki`, `mimir`, `tempo`).
+
+```yaml
+loki:
+  basicAuth:
+    secretName: "loki-basic-auth"  # Secret in the loki namespace
+
+mimir:
+  basicAuth:
+    secretName: "mimir-basic-auth"  # Secret in the mimir namespace
+
+tempo:
+  basicAuth:
+    secretName: "tempo-basic-auth"  # Secret in the tempo namespace
+```
+
+The Secret must contain a `users` key with `.htpasswd`-formatted credentials. Example using `htpasswd`:
+
+```bash
+htpasswd -c auth myuser
+kubectl create secret generic loki-basic-auth --from-file=users=auth -n loki
+```
+
+When both JWT and Basic Auth are configured for the same service, routes accept either credential type — callers can use whichever method they support.
 
 ## Architecture Notes
 
@@ -116,7 +143,8 @@ This app creates multiple `HTTPRoute` resources rather than a single route becau
 
 **Operational Considerations:**
 
-- All routes share the same hostname, `X-Scope-OrgID` enforcement, and JWT provider list
+- All routes share the same hostname and `X-Scope-OrgID` enforcement
+- JWT providers (`auth.jwt.providers`) are shared across all services; Basic Auth secrets are per-service
 - JWT validation is done inline by Envoy Gateway — no external auth service required
 
 ## Configuration & Deployment
