@@ -48,6 +48,13 @@ The observability-platform-api creates `HTTPRoute` and `GRPCRoute` resources und
 │             │ /loki/api/v1/index                                           │                                  │               │
 │             │ /loki/api/v1/rules                                           │                                  │               │
 │             │ /loki/api/v1/detected_labels                                 │                                  │               │
+│             │ /loki/api/v1/tail                                            │                                  │               │
+│             │ /loki/api/v1/format_query                                    │                                  │               │
+│             │ /loki/api/v1/index/stats                                     │                                  │               │
+│             │ /loki/api/v1/index/volume                                    │                                  │               │
+│             │ /loki/api/v1/index/volume_range                              │                                  │               │
+│             │ /loki/api/v1/detected_fields                                 │                                  │               │
+│             │ /loki/api/v1/patterns                                        │                                  │               │
 │ HTTPS       │ /loki/api/v1/push                                            │ Logs / Loki                      │ Write         │
 │ HTTPS       │ /otlp/v1/logs                                                │ Logs / Loki (OTLP HTTP)          │ Write         │
 │ gRPC (+TLS) │ opentelemetry.proto.collector.logs.v1.LogsService            │ Logs / Loki (OTLP gRPC)          │ Write         │
@@ -56,6 +63,7 @@ The observability-platform-api creates `HTTPRoute` and `GRPCRoute` resources und
 │             │ /prometheus/api/v1/query_exemplars                           │                                  │               │
 │             │ /prometheus/api/v1/labels                                    │                                  │               │
 │             │ /prometheus/api/v1/label                                     │                                  │               │
+│             │ /prometheus/api/v1/series                                    │                                  │               │
 │             │ /prometheus/api/v1/rules                                     │                                  │               │
 │             │ /prometheus/api/v1/status                                    │                                  │               │
 │             │ /prometheus/api/v1/metadata                                  │                                  │               │
@@ -66,7 +74,10 @@ The observability-platform-api creates `HTTPRoute` and `GRPCRoute` resources und
 │             │ /tempo/api/status/buildinfo                                  │                                  │               │
 │             │ /tempo/api/metrics/query_range                               │                                  │               │
 │             │ /tempo/api/search                                            │                                  │               │
+│             │ /tempo/api/search/tags                                       │                                  │               │
 │             │ /tempo/api/v2/search                                         │                                  │               │
+│             │ /tempo/api/v2/search/tags                                    │                                  │               │
+│             │ /tempo/api/v2/search/tag/{tag}/values                        │                                  │               │
 │             │ /tempo/api/traces                                            │                                  │               │
 │             │ /tempo/api/v2/traces  (all rewritten, /tempo prefix removed) │                                  │               │
 │ gRPC (+TLS) │ /tempopb                                                     │ Traces / Tempo                   │ Read          │

@@ -40,6 +40,13 @@ loki:
     - /loki/api/v1/query_range
     - /loki/api/v1/series
     - /loki/api/v1/detected_labels
+    - /loki/api/v1/tail
+    - /loki/api/v1/format_query
+    - /loki/api/v1/index/stats
+    - /loki/api/v1/index/volume
+    - /loki/api/v1/index/volume_range
+    - /loki/api/v1/detected_fields
+    - /loki/api/v1/patterns
   # -- HTTP write route configuration.
   write:
     # -- Paths forwarded as-is to loki-gateway:80.
@@ -74,6 +81,7 @@ mimir:
     - /prometheus/api/v1/query
     - /prometheus/api/v1/query_exemplars
     - /prometheus/api/v1/query_range
+    - /prometheus/api/v1/series
     - /prometheus/api/v1/status
     - /prometheus/api/v1/metadata
     - /prometheus/api/v1/detected_labels
@@ -107,7 +115,10 @@ tempo:
     - /tempo/api/status/buildinfo
     - /tempo/api/metrics/query_range
     - /tempo/api/search
+    - /tempo/api/search/tags
     - /tempo/api/v2/search
+    - /tempo/api/v2/search/tags
+    - /tempo/api/v2/search/tag/
     - /tempo/api/traces
     - /tempo/api/v2/traces
     # -- gRPC read queries. Routes to tempo-query-frontend:9095.

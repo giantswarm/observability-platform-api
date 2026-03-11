@@ -95,28 +95,25 @@ TOKEN=$(kubectl oidc-login get-token \
 
 ## 2b. Get Basic Auth credentials
 
-The BasicAuth credentials are stored in per-service Kubernetes Secrets in htpasswd format. The secret names follow the pattern `<service>-gateway-httproute-auth` in each service namespace.
-
-List available usernames in the secret (passwords are one-way SHA-hashed — you need to know the original password):
+The source secrets are stored in the `org-giantswarm` namespace, named `<mc-name>-observability-<logs|metrics|traces>-auth`. The username is the MC name (e.g. `graveler`). The plain-text password is under the `password` key:
 
 ```bash
-# Example for loki (same pattern for mimir and tempo)
-kubectl get secret loki-gateway-httproute-auth -n loki \
-  -o jsonpath='{.data.\.htpasswd}' | base64 -d | cut -d: -f1
+MC="<mc-name>"  # e.g. graveler
+
+# Loki password:
+kubectl get secret -n org-giantswarm ${MC}-observability-logs-auth -oyaml \
+  | yq .data.password | base64 -d
+
+# Mimir password:
+kubectl get secret -n org-giantswarm ${MC}-observability-metrics-auth -oyaml \
+  | yq .data.password | base64 -d
+
+# Tempo password:
+kubectl get secret -n org-giantswarm ${MC}-observability-traces-auth -oyaml \
+  | yq .data.password | base64 -d
 ```
 
-If you need to create a new test user with a known password:
-
-```bash
-# Add a test user to an existing secret
-EXISTING=$(kubectl get secret loki-gateway-httproute-auth -n loki \
-  -o jsonpath='{.data.\.htpasswd}' | base64 -d)
-NEW_ENTRY=$(htpasswd -nb testuser testpassword)
-kubectl create secret generic loki-gateway-httproute-auth \
-  --from-literal=".htpasswd=${EXISTING}
-${NEW_ENTRY}" \
-  -n loki --dry-run=client -o yaml | kubectl apply -f -
-```
+These source secrets are synced into the service namespaces as `loki-gateway-httproute-auth` (in `loki`), `mimir-gateway-httproute-auth` (in `mimir`), and `tempo-gateway-httproute-auth` (in `tempo`), which is what the `SecurityPolicy` references via `basicAuth.secretName`.
 
 ## 3. Set test variables
 
@@ -127,9 +124,9 @@ AUTH="Authorization: Bearer $TOKEN"
 SCOPE="X-Scope-OrgID: $ORG"
 GRPC_HOST="${BASE#https://}"
 
-# For Basic Auth testing — use credentials from the secret (see section 2b above)
-BASIC_USER="<username from secret>"
-BASIC_PASS="<password — look up in vault or create a test user>"
+# For Basic Auth testing — username is the MC name, password from section 2b above
+BASIC_USER="<mc-name>"  # e.g. graveler
+BASIC_PASS="<password from org-giantswarm secret>"
 BASIC_AUTH="Authorization: Basic $(echo -n "$BASIC_USER:$BASIC_PASS" | base64)"
 ```
 
