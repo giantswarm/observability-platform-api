@@ -30,7 +30,7 @@ spec:
   - {{ tpl . $ | quote }}
   {{- end }}
   rules:
-  {{- range .Values.loki.writePaths }}
+  {{- range .Values.loki.write.paths }}
   - backendRefs:
     - name: loki-gateway
       namespace: {{ $.Values.loki.namespace }}

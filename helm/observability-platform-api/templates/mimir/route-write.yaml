@@ -34,7 +34,7 @@ spec:
   - {{ tpl . $ | quote }}
   {{- end }}
   rules:
-  {{- range .Values.mimir.writeRewritePaths }}
+  {{- range .Values.mimir.write.stripPrefixPaths }}
   - backendRefs:
     - name: mimir-gateway
       namespace: {{ $.Values.mimir.namespace }}
@@ -73,7 +73,7 @@ spec:
         type: PathPrefix
         value: {{ . }}
   {{- end }}
-  {{- range .Values.mimir.writePassthroughPaths }}
+  {{- range .Values.mimir.write.paths }}
   - backendRefs:
     - name: mimir-gateway
       namespace: {{ $.Values.mimir.namespace }}

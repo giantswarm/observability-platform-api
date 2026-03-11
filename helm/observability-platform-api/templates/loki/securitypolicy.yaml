@@ -21,6 +21,9 @@ spec:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: {{ include "resource.default.name" . }}-loki-write-api
+  - group: gateway.networking.k8s.io
+    kind: GRPCRoute
+    name: {{ include "resource.default.name" . }}-loki-write-api-grpc
   {{- if .Values.auth.jwt.providers }}
   jwt:
     providers:

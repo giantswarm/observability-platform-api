@@ -22,85 +22,106 @@ auth:
 loki:
   enabled: false
   namespace: loki
-  # -- Hostname for all Loki routes. Supports Helm template strings.
   hostname: ""
   parentRefs:
   - name: giantswarm-default
     namespace: envoy-gateway-system
   basicAuth:
-    # -- Name of a Kubernetes Secret with .htpasswd-formatted credentials in the loki namespace.
-    # When set alongside auth.jwt.providers, routes accept either Basic Auth or JWT.
     secretName: ""
-  # -- Paths exposed on the Loki read route. Each path is matched with PathPrefix.
-  readPaths:
-  - /loki/api/v1/labels
-  - /loki/api/v1/label
-  - /loki/api/v1/rules
-  - /loki/api/v1/query
-  - /loki/api/v1/index
-  - /loki/api/v1/query_range
-  - /loki/api/v1/series
-  - /loki/api/v1/detected_labels
-  # -- Paths exposed on the Loki write route. Each path is matched with PathPrefix and forwarded as-is.
-  writePaths:
-  - /loki/api/v1/push
-  - /otlp/v1/logs
+  # -- HTTP read route configuration.
+  read:
+    # -- Paths exposed on the Loki read route. Each matched with PathPrefix and forwarded as-is to loki-gateway:80.
+    paths:
+    - /loki/api/v1/labels
+    - /loki/api/v1/label
+    - /loki/api/v1/rules
+    - /loki/api/v1/query
+    - /loki/api/v1/index
+    - /loki/api/v1/query_range
+    - /loki/api/v1/series
+    - /loki/api/v1/detected_labels
+  # -- HTTP write route configuration.
+  write:
+    # -- Paths forwarded as-is to loki-gateway:80.
+    paths:
+    - /loki/api/v1/push
+    - /otlp/v1/logs
+    # -- Paths whose leading prefix is stripped before forwarding (e.g. /loki/api/v1/push → /api/v1/push).
+    # Leave empty for Loki — loki-gateway handles the /loki prefix natively.
+    stripPrefixPaths: []
+    # -- gRPC OTLP ingestion. Routes directly to loki-distributor (bypasses the nginx gateway,
+    # which does not handle gRPC). Set backendService/backendPort to enable.
+    grpc:
+      backendService: loki-distributor
+      backendPort: 9095
 
 mimir:
   enabled: false
   namespace: mimir
-  # -- Hostname for all Mimir routes. Supports Helm template strings.
   hostname: ""
   parentRefs:
   - name: giantswarm-default
     namespace: envoy-gateway-system
   basicAuth:
-    # -- Name of a Kubernetes Secret with .htpasswd-formatted credentials in the mimir namespace.
-    # When set alongside auth.jwt.providers, routes accept either Basic Auth or JWT.
     secretName: ""
-  # -- Paths exposed on the Mimir read route. Each path is matched with PathPrefix.
-  readPaths:
-  - /prometheus/api/v1/labels
-  - /prometheus/api/v1/label
-  - /prometheus/api/v1/rules
-  - /prometheus/api/v1/query
-  - /prometheus/api/v1/query_exemplars
-  - /prometheus/api/v1/query_range
-  - /prometheus/api/v1/status
-  - /prometheus/api/v1/metadata
-  - /prometheus/api/v1/detected_labels
-  # -- Paths forwarded to Mimir with the /prometheus prefix stripped (e.g. /prometheus/api/v1/push → /api/v1/push).
-  writeRewritePaths:
-  - /prometheus/api/v1/push
-  # -- Paths forwarded to Mimir as-is (no rewrite). Used for OTLP ingestion.
-  writePassthroughPaths:
-  - /otlp/v1/metrics
+  # -- HTTP read route configuration.
+  read:
+    # -- Paths exposed on the Mimir read route. Each matched with PathPrefix and forwarded as-is to mimir-gateway:80.
+    paths:
+    - /prometheus/api/v1/labels
+    - /prometheus/api/v1/label
+    - /prometheus/api/v1/rules
+    - /prometheus/api/v1/query
+    - /prometheus/api/v1/query_exemplars
+    - /prometheus/api/v1/query_range
+    - /prometheus/api/v1/status
+    - /prometheus/api/v1/metadata
+    - /prometheus/api/v1/detected_labels
+  # -- HTTP write route configuration.
+  write:
+    # -- Paths forwarded as-is to mimir-gateway:80 (OTLP ingestion).
+    paths:
+    - /otlp/v1/metrics
+    # -- Paths whose leading /prometheus prefix is stripped before forwarding to mimir-gateway:80.
+    # Required because mimir-gateway's nginx routes remote_write at /api/v1/push (no /prometheus prefix),
+    # while the external API convention is /prometheus/api/v1/push.
+    stripPrefixPaths:
+    - /prometheus/api/v1/push
 
 tempo:
   enabled: false
   namespace: tempo
-  # -- Hostname for all Tempo routes. Supports Helm template strings.
   hostname: ""
   parentRefs:
   - name: giantswarm-default
     namespace: envoy-gateway-system
   basicAuth:
-    # -- Name of a Kubernetes Secret with .htpasswd-formatted credentials in the tempo namespace.
-    # When set alongside auth.jwt.providers, routes accept either Basic Auth or JWT.
     secretName: ""
-  # -- Paths exposed on the Tempo read route. Each path is matched with PathPrefix and forwarded
-  # with the /tempo prefix stripped (e.g. /tempo/api/echo → /api/echo).
-  readPaths:
-  - /tempo/api/echo
-  - /tempo/api/status/buildinfo
-  - /tempo/api/metrics/query_range
-  - /tempo/api/search
-  - /tempo/api/v2/search
-  - /tempo/api/traces
-  - /tempo/api/v2/traces
-  # -- Paths exposed on the Tempo OTLP write route. Each path is matched with PathPrefix and forwarded as-is.
-  writePaths:
-  - /v1/traces
+  # -- HTTP read route configuration.
+  read:
+    # -- Paths exposed on the Tempo read route. Each matched with PathPrefix.
+    # The /tempo prefix is stripped before forwarding to tempo-query-frontend:3200
+    # (all paths in this list are subject to the prefix-strip rewrite).
+    paths:
+    - /tempo/api/echo
+    - /tempo/api/status/buildinfo
+    - /tempo/api/metrics/query_range
+    - /tempo/api/search
+    - /tempo/api/v2/search
+    - /tempo/api/traces
+    - /tempo/api/v2/traces
+    # -- gRPC read queries. Routes to tempo-query-frontend:9095.
+    # Matches any gRPC service matching regex "tempopb\.[^/]+".
+    grpc:
+      backendService: tempo-query-frontend
+      backendPort: 9095
+  # -- HTTP write route configuration.
+  write:
+    # -- Paths forwarded as-is to tempo-distributor:4318 (OTLP HTTP trace ingestion).
+    paths:
+    - /v1/traces
+    # -- No prefix stripping needed for Tempo write paths.
+    stripPrefixPaths: []
 
 ingresses:
   - name: loki

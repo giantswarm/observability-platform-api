@@ -36,7 +36,7 @@ spec:
       namespace: {{ .Values.mimir.namespace }}
       port: 80
     matches:
-    {{- range .Values.mimir.readPaths }}
+    {{- range .Values.mimir.read.paths }}
     - path:
         type: PathPrefix
         value: {{ . }}
@@ -62,7 +62,7 @@ spec:
         kind: HTTPRouteFilter
         name: {{ include "resource.default.name" . }}-mimir-headers-check
     matches:
-    {{- range .Values.mimir.readPaths }}
+    {{- range .Values.mimir.read.paths }}
     - path:
         type: PathPrefix
         value: {{ . }}

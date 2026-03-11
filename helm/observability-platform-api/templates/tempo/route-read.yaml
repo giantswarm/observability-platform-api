@@ -34,7 +34,7 @@ spec:
       namespace: {{ .Values.tempo.namespace }}
       port: 3200
     matches:
-    {{- range .Values.tempo.readPaths }}
+    {{- range .Values.tempo.read.paths }}
     - path:
         type: PathPrefix
         value: {{ . }}
@@ -65,7 +65,7 @@ spec:
         kind: HTTPRouteFilter
         name: {{ include "resource.default.name" . }}-tempo-headers-check
     matches:
-    {{- range .Values.tempo.readPaths }}
+    {{- range .Values.tempo.read.paths }}
     - path:
         type: PathPrefix
         value: {{ . }}

@@ -31,9 +31,9 @@ spec:
   {{- end }}
   rules:
   - backendRefs:
-    - name: tempo-query-frontend
+    - name: {{ .Values.tempo.read.grpc.backendService }}
       namespace: {{ .Values.tempo.namespace }}
-      port: 9095
+      port: {{ .Values.tempo.read.grpc.backendPort }}
     matches:
     - method:
         service: "tempopb\\.[^/]+"

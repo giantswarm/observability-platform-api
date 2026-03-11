@@ -35,7 +35,7 @@ spec:
       namespace: {{ .Values.loki.namespace }}
       port: 80
     matches:
-    {{- range .Values.loki.readPaths }}
+    {{- range .Values.loki.read.paths }}
     - path:
         type: PathPrefix
         value: {{ . }}
@@ -61,7 +61,7 @@ spec:
         kind: HTTPRouteFilter
         name: {{ include "resource.default.name" . }}-loki-headers-check
     matches:
-    {{- range .Values.loki.readPaths }}
+    {{- range .Values.loki.read.paths }}
     - path:
         type: PathPrefix
         value: {{ . }}

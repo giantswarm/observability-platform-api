@@ -29,7 +29,7 @@ spec:
   - {{ tpl . $ | quote }}
   {{- end }}
   rules:
-  {{- range .Values.tempo.writePaths }}
+  {{- range .Values.tempo.write.paths }}
   - backendRefs:
     - name: tempo-distributor
       namespace: {{ $.Values.tempo.namespace }}

@@ -15,6 +15,18 @@ loki:
     namespace: envoy-gateway-system
   basicAuth:
     secretName: "loki-basic-auth"
+  read:
+    paths:
+    - /loki/api/v1/labels
+    - /loki/api/v1/query
+  write:
+    paths:
+    - /loki/api/v1/push
+    - /otlp/v1/logs
+    stripPrefixPaths: []
+    grpc:
+      backendService: loki-distributor
+      backendPort: 9095
 
 mimir:
   enabled: true
@@ -25,6 +37,15 @@ mimir:
     namespace: envoy-gateway-system
   basicAuth:
     secretName: "mimir-basic-auth"
+  read:
+    paths:
+    - /prometheus/api/v1/labels
+    - /prometheus/api/v1/query
+  write:
+    paths:
+    - /otlp/v1/metrics
+    stripPrefixPaths:
+    - /prometheus/api/v1/push
 
 tempo:
   enabled: true
@@ -35,3 +56,14 @@ tempo:
     namespace: envoy-gateway-system
   basicAuth:
     secretName: "tempo-basic-auth"
+  read:
+    paths:
+    - /tempo/api/echo
+    - /tempo/api/search
+    grpc:
+      backendService: tempo-query-frontend
+      backendPort: 9095
+  write:
+    paths:
+    - /v1/traces
+    stripPrefixPaths: []

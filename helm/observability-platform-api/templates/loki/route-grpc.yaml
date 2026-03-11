@@ -1,0 +1,55 @@
+{{/*
+Loki gRPC OTLP write route (loki.enabled=true)
+
+Resources:
+  - GRPCRoute (loki-write-api-grpc): routes gRPC OTLP log ingestion to loki-distributor:9095.
+    Single rule: matches opentelemetry.proto.collector.logs.v1.LogsService + X-Scope-OrgID header
+                 → forwards to backend.
+    Requests missing X-Scope-OrgID do not match and are rejected by Envoy (no route match).
+    Note: GRPCRoute does not support HTTPRouteFilter ExtensionRef, so a directResponse
+    rule cannot be used; missing-header requests get a non-401 rejection instead.
+
+    The route targets loki-distributor directly (not loki-gateway) because the nginx gateway
+    does not handle gRPC traffic.
+
+Exposed gRPC service:
+  opentelemetry.proto.collector.logs.v1.LogsService  (OTLP log ingestion)
+*/}}
+{{- if and .Values.loki.enabled (or .Values.auth.jwt.providers .Values.loki.basicAuth.secretName) -}}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: {{ include "resource.default.name" . }}-loki-write-api-grpc
+  namespace: {{ .Values.loki.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  {{- with .Values.loki.parentRefs }}
+  parentRefs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.loki.hostname }}
+  hostnames:
+  - {{ tpl . $ | quote }}
+  {{- end }}
+  rules:
+  - backendRefs:
+    - name: {{ .Values.loki.write.grpc.backendService }}
+      namespace: {{ .Values.loki.namespace }}
+      port: {{ .Values.loki.write.grpc.backendPort }}
+    matches:
+    - method:
+        service: opentelemetry.proto.collector.logs.v1.LogsService
+        type: Exact
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    filters:
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set:
+        - name: X-Scope-OrgID
+          value: "%REQ(X-Scope-OrgID)%"
+{{- end }}
