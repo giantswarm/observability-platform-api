@@ -6,19 +6,19 @@ This document describes how to configure and test all exposed routes (Loki, Mimi
 
 - Access to a management cluster with the app deployed
 - `curl` and `jq` installed
-- `grpcurl` installed (for Tempo gRPC testing)
+- `grpcurl` installed (for Tempo and Loki gRPC testing)
 - An Azure AD app registration with a client secret, or a Dex OIDC client
 
 ## 1. Helm template check
 
-Before deploying, verify the rendered output has no stale `extAuth` references and that `jwt.providers` is rendered correctly:
+Before deploying, verify the rendered output has no stale `extAuth` references and that auth blocks are rendered correctly:
 
 ```bash
 helm template observability-platform-api \
   ./helm/observability-platform-api \
   -f helm/observability-platform-api/ci/test-values.yaml
 
-# Confirm jwt: blocks are present, no extAuth: blocks
+# Confirm jwt: blocks are present in SecurityPolicy, no extAuth: blocks
 helm template observability-platform-api \
   ./helm/observability-platform-api \
   -f helm/observability-platform-api/ci/test-values.yaml \
@@ -30,22 +30,21 @@ helm template observability-platform-api \
   | grep -c extAuth
 # expect: 0
 
-# Verify that enabling a service with no providers renders nothing (no routes created)
+# Verify that enabling a service with no auth configured renders nothing (no routes created)
 helm template observability-platform-api ./helm/observability-platform-api \
   --set loki.enabled=true | grep -c 'kind:'
 # expect: 0
 ```
 
-### What happens when `auth.jwt.providers` is empty?
+### What happens when auth is not configured?
 
-Each route template uses `{{- if and .Values.<service>.enabled .Values.auth.jwt.providers -}}`,
-so resources are only rendered when both the service is enabled and providers are configured.
+Each route template renders only when the service is enabled **and** at least one auth method is configured for that service.
 
 | Services enabled | `auth.jwt.providers` | Result |
 |-----------------|---------------------|--------|
 | All false (default) | `[]` | Chart renders fine (no routes created) |
 | Any true | `[]` | Chart renders fine (no routes created) |
-| Any true | populated | Chart renders correctly |
+| Any true | populated | Routes rendered with JWT |
 
 ## 2. Get a test token
 
@@ -92,17 +91,18 @@ BASE="https://observability.<codename>.<base-domain>"
 ORG="my-tenant"
 AUTH="Authorization: Bearer $TOKEN"
 SCOPE="X-Scope-OrgID: $ORG"
+GRPC_HOST="${BASE#https://}"
 ```
 
 ## 4. Test all paths
 
-For every path, three scenarios are validated:
+For every path, the following scenarios are validated:
 
 | Scenario | Expected (HTTP) | Expected (gRPC) |
 |----------|----------------|-----------------|
 | Valid JWT + `X-Scope-OrgID` present | 2xx (backend response) | grpc-status: 12 (backend reached) |
 | Valid JWT, `X-Scope-OrgID` missing | 401 | no-route rejection (not a strict 401) |
-| No JWT | 401 | grpc-status: 16 (UNAUTHENTICATED) |
+| No auth credential | 401 | grpc-status: 16 (UNAUTHENTICATED) |
 
 ### Loki read
 
@@ -110,7 +110,7 @@ Backend: `loki-gateway:80`. No path rewrite.
 
 ```bash
 # Full auth scenario test on representative path
-curl -si "$BASE/loki/api/v1/labels" -H "$AUTH" -H "$SCOPE"  # expect 2xx
+curl -si "$BASE/loki/api/v1/labels" -H "$AUTH" -H "$SCOPE"  # expect 2xx (JWT)
 curl -si "$BASE/loki/api/v1/labels" -H "$AUTH"               # expect 401
 curl -si "$BASE/loki/api/v1/labels" -H "$SCOPE"              # expect 401
 
@@ -139,7 +139,7 @@ PAYLOAD='{"streams":[{"stream":{"job":"test"},"values":[["'"$(date +%s%N)"'","te
 
 curl -si -X POST "$BASE/loki/api/v1/push" \
   -H "$AUTH" -H "$SCOPE" -H "Content-Type: application/json" -d "$PAYLOAD"
-# expect: 204
+# expect: 204 (JWT)
 
 curl -si -X POST "$BASE/loki/api/v1/push" \
   -H "$AUTH" -H "Content-Type: application/json" -d "$PAYLOAD"
@@ -147,7 +147,7 @@ curl -si -X POST "$BASE/loki/api/v1/push" \
 
 curl -si -X POST "$BASE/loki/api/v1/push" \
   -H "$SCOPE" -H "Content-Type: application/json" -d "$PAYLOAD"
-# expect: 401 (missing JWT)
+# expect: 401 (no auth credential)
 ```
 
 ### Mimir read
@@ -155,7 +155,7 @@ curl -si -X POST "$BASE/loki/api/v1/push" \
 Backend: `mimir-gateway:80`. No path rewrite.
 
 ```bash
-curl -si "$BASE/prometheus/api/v1/labels" -H "$AUTH" -H "$SCOPE"  # expect 2xx
+curl -si "$BASE/prometheus/api/v1/labels" -H "$AUTH" -H "$SCOPE"  # expect 2xx (JWT)
 curl -si "$BASE/prometheus/api/v1/labels" -H "$AUTH"               # expect 401
 curl -si "$BASE/prometheus/api/v1/labels" -H "$SCOPE"              # expect 401
 
@@ -193,7 +193,7 @@ curl -si -X POST "$BASE/prometheus/api/v1/push" -H "$SCOPE"  # expect 401
 Backend: `tempo-query-frontend:3200`. Path rewrite: `/tempo` prefix stripped before forwarding.
 
 ```bash
-curl -si "$BASE/tempo/api/echo" -H "$AUTH" -H "$SCOPE"  # expect 200, body: "echo"
+curl -si "$BASE/tempo/api/echo" -H "$AUTH" -H "$SCOPE"  # expect 200, body: "echo" (JWT)
 curl -si "$BASE/tempo/api/echo" -H "$AUTH"               # expect 401
 curl -si "$BASE/tempo/api/echo" -H "$SCOPE"              # expect 401
 
@@ -209,9 +209,32 @@ done
 # expect: 200, 400 (params required), or 404 (trace not found) — not 401/403
 ```
 
+### Loki write — gRPC OTLP
+
+Backend: `loki-distributor:9095`. Separate `GRPCRoute` — bypasses `loki-gateway` (nginx does not handle gRPC).
+
+> **Note on missing `X-Scope-OrgID`**: `GRPCRoute` does not support `HTTPRouteFilter` via `ExtensionRef`, so requests missing `X-Scope-OrgID` get a no-route rejection rather than a strict 401.
+
+```bash
+# Valid auth — request reaches Loki, grpc-status: 12 (UNIMPLEMENTED) confirms routing succeeded
+curl -si --http2 -X POST "https://$GRPC_HOST/opentelemetry.proto.collector.logs.v1.LogsService/Export" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Scope-OrgID: $ORG" \
+  -H "Content-Type: application/grpc" \
+  --data-binary $'\x00\x00\x00\x00\x00'
+# expect: grpc-status: 12 (not 16)
+
+# No JWT — SecurityPolicy returns grpc-status: 16 (UNAUTHENTICATED)
+curl -si --http2 -X POST "https://$GRPC_HOST/opentelemetry.proto.collector.logs.v1.LogsService/Export" \
+  -H "X-Scope-OrgID: $ORG" \
+  -H "Content-Type: application/grpc" \
+  --data-binary $'\x00\x00\x00\x00\x00'
+# expect: grpc-status: 16
+```
+
 ### Tempo read — gRPC
 
-Backend: `tempo-query-frontend:9095`. Separate HTTPRoute from the HTTP routes above.
+Backend: `tempo-query-frontend:9095`. Separate `GRPCRoute` from the HTTP routes above.
 
 > **Note on GRPCRoute**: The gRPC route uses `GRPCRoute` (not `HTTPRoute`) because Envoy
 > Gateway's SecurityPolicy JWT enforcement does not correctly apply to gRPC traffic routed
@@ -252,7 +275,7 @@ curl -si --http2 -X POST "https://$GRPC_HOST/tempopb.StreamingQuerier/SearchTags
 
 ### Tempo OTLP write
 
-Backend: `tempo-distributor:4318`. OTLP HTTP only — no gRPC write route (matches old NGINX config).
+Backend: `tempo-distributor:4318`. OTLP HTTP trace ingestion.
 
 ```bash
 curl -si -X POST "$BASE/v1/traces" \
@@ -270,6 +293,28 @@ curl -si -X POST "$BASE/v1/traces" \
 # expect: 401
 ```
 
+### Tempo write — gRPC OTLP
+
+Backend: `tempo-distributor:4317`. Separate `GRPCRoute` — routes directly to `tempo-distributor` (nginx does not handle gRPC).
+
+> **Note on missing `X-Scope-OrgID`**: `GRPCRoute` does not support `HTTPRouteFilter` via `ExtensionRef`, so requests missing `X-Scope-OrgID` get a no-route rejection rather than a strict 401.
+
+```bash
+# With auth and X-Scope-OrgID — reaches backend
+grpcurl -H "Authorization: Bearer $TOKEN" \
+  -H "X-Scope-OrgID: $ORG" \
+  "$GRPC_HOST:443" \
+  opentelemetry.proto.collector.trace.v1.TraceService/Export
+# expect: response from tempo-distributor (grpc-status: 0 or similar — not 16)
+
+# No JWT — SecurityPolicy returns grpc-status: 16 (UNAUTHENTICATED)
+curl -si --http2 -X POST "https://$GRPC_HOST/opentelemetry.proto.collector.trace.v1.TraceService/Export" \
+  -H "X-Scope-OrgID: $ORG" \
+  -H "Content-Type: application/grpc" \
+  --data-binary $'\x00\x00\x00\x00\x00'
+# expect: grpc-status: 16
+```
+
 ## 5. Verify SecurityPolicy status in-cluster
 
 After deployment, confirm Envoy accepted all SecurityPolicies:
@@ -279,14 +324,15 @@ kubectl get securitypolicy -A
 # All policies should show ACCEPTED=True
 
 RELEASE="observability-platform-api"
+# One consolidated SecurityPolicy per service for Loki and Mimir (covers all routes in that namespace).
+# Tempo has separate policies per route because the GRPCRoute requires its own targetRef.
 for NS_NAME in \
-  "loki/$RELEASE-loki-read-api" \
-  "loki/$RELEASE-loki-write-api" \
-  "mimir/$RELEASE-mimir-read-api" \
-  "mimir/$RELEASE-mimir-write-api" \
+  "loki/$RELEASE-loki" \
+  "mimir/$RELEASE-mimir" \
   "tempo/$RELEASE-tempo-read-api" \
   "tempo/$RELEASE-tempo-read-api-grpc" \
-  "tempo/$RELEASE-tempo-otlp-write-api"; do
+  "tempo/$RELEASE-tempo-otlp-write-api" \
+  "tempo/$RELEASE-tempo-write-api-grpc"; do
   NS=$(echo $NS_NAME | cut -d/ -f1)
   NAME=$(echo $NS_NAME | cut -d/ -f2)
   STATUS=$(kubectl get securitypolicy -n $NS $NAME -o json 2>/dev/null \

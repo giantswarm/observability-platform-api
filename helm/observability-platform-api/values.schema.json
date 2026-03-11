@@ -16,6 +16,26 @@
                 },
                 "parentRefs": {
                     "type": "array"
+                },
+                "read": {
+                    "type": "object",
+                    "properties": {
+                        "paths": { "type": "array", "items": { "type": "string" } }
+                    }
+                },
+                "write": {
+                    "type": "object",
+                    "properties": {
+                        "paths": { "type": "array", "items": { "type": "string" } },
+                        "stripPrefixPaths": { "type": "array", "items": { "type": "string" } },
+                        "grpc": {
+                            "type": "object",
+                            "properties": {
+                                "backendService": { "type": "string" },
+                                "backendPort": { "type": "integer" }
+                            }
+                        }
+                    }
                 }
             }
         },
@@ -33,6 +53,19 @@
                 },
                 "parentRefs": {
                     "type": "array"
+                },
+                "read": {
+                    "type": "object",
+                    "properties": {
+                        "paths": { "type": "array", "items": { "type": "string" } }
+                    }
+                },
+                "write": {
+                    "type": "object",
+                    "properties": {
+                        "paths": { "type": "array", "items": { "type": "string" } },
+                        "stripPrefixPaths": { "type": "array", "items": { "type": "string" } }
+                    }
                 }
             }
         },
@@ -50,6 +83,33 @@
                 },
                 "parentRefs": {
                     "type": "array"
+                },
+                "read": {
+                    "type": "object",
+                    "properties": {
+                        "paths": { "type": "array", "items": { "type": "string" } },
+                        "grpc": {
+                            "type": "object",
+                            "properties": {
+                                "backendService": { "type": "string" },
+                                "backendPort": { "type": "integer" }
+                            }
+                        }
+                    }
+                },
+                "write": {
+                    "type": "object",
+                    "properties": {
+                        "paths": { "type": "array", "items": { "type": "string" } },
+                        "stripPrefixPaths": { "type": "array", "items": { "type": "string" } },
+                        "grpc": {
+                            "type": "object",
+                            "properties": {
+                                "backendService": { "type": "string" },
+                                "backendPort": { "type": "integer" }
+                            }
+                        }
+                    }
                 }
             }
         },
@@ -121,6 +181,24 @@
                                             "uri": {
                                                 "type": "string"
                                             }
+                                        }
+                                    },
+                                    "extractFrom": {
+                                        "type": "object",
+                                        "description": "Restrict where the JWT is extracted from. Best practice: set headers[].valuePrefix to 'Bearer ' so that Basic Auth credentials on the Authorization header are not mistakenly parsed as a JWT.",
+                                        "properties": {
+                                            "headers": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "name": { "type": "string" },
+                                                        "valuePrefix": { "type": "string" }
+                                                    }
+                                                }
+                                            },
+                                            "cookies": { "type": "array", "items": { "type": "string" } },
+                                            "params": { "type": "array", "items": { "type": "string" } }
                                         }
                                     }
                                 }

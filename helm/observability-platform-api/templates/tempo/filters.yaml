@@ -1,0 +1,41 @@
+{{/*
+Tempo HTTPRouteFilters (tempo.enabled=true)
+
+Resources:
+  - HTTPRouteFilter (tempo-headers-check): returns 401 when X-Scope-OrgID header is missing.
+    Shared by both tempo-read-api and tempo-otlp-write-api HTTPRoutes.
+  - HTTPRouteFilter (tempo-rewrite): strips the /tempo prefix before forwarding
+    (/tempo/api/... → /api/...). Used by tempo-read-api.
+*/}}
+{{- if and .Values.tempo.enabled .Values.auth.jwt.providers -}}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: HTTPRouteFilter
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo-headers-check
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  directResponse:
+    contentType: text/plain
+    statusCode: 401
+    body:
+      type: Inline
+      inline: "Bad Request"
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: HTTPRouteFilter
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo-rewrite
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  urlRewrite:
+    path:
+      type: ReplaceRegexMatch
+      replaceRegexMatch:
+        pattern: "^/tempo(/.*)$"
+        substitution: "\\1"
+{{- end }}
