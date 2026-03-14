@@ -1,0 +1,67 @@
+{{/*
+Loki write API routes (loki.enabled=true)
+
+Resources:
+  - HTTPRoute: routes write requests to loki-gateway:80 in loki.namespace.
+    For each path in loki.writePaths:
+      Rule (with header): matches path + X-Scope-OrgID header → forwards to backend.
+      Rule (no header):   matches path only → returns 401 via HTTPRouteFilter.
+
+Exposed paths (configured via loki.writePaths):
+  /loki/api/v1/push
+  /otlp/v1/logs    (forwarded as-is; nginx gateway proxies to Loki OTLP ingest)
+*/}}
+{{- if and .Values.loki.enabled .Values.auth.jwt.providers -}}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "resource.default.name" . }}-loki-write-api
+  namespace: {{ .Values.loki.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  {{- with .Values.loki.parentRefs }}
+  parentRefs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.loki.hostname }}
+  hostnames:
+  - {{ tpl . $ | quote }}
+  {{- end }}
+  rules:
+  {{- range .Values.loki.write.paths }}
+  - backendRefs:
+    - name: loki-gateway
+      namespace: {{ $.Values.loki.namespace }}
+      port: 80
+    matches:
+    - path:
+        type: PathPrefix
+        value: {{ . }}
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    filters:
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set:
+        - name: X-Scope-OrgID
+          value: "%REQ(X-Scope-OrgID)%"
+  - backendRefs:
+    - name: loki-gateway
+      namespace: {{ $.Values.loki.namespace }}
+      port: 80
+    filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: {{ include "resource.default.name" $ }}-loki-headers-check
+    matches:
+    - path:
+        type: PathPrefix
+        value: {{ . }}
+  {{- end }}
+{{- end }}

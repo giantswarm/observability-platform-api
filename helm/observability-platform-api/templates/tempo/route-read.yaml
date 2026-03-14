@@ -1,0 +1,73 @@
+{{/*
+Tempo HTTP read API routes (tempo.enabled=true)
+
+Resources:
+  - HTTPRoute (tempo-read-api): routes read requests to tempo-query-frontend:3200.
+    Rule 1: matches path + X-Scope-OrgID header → strips /tempo prefix and forwards.
+    Rule 2: matches path only (no header) → returns 401 via HTTPRouteFilter.
+
+Exposed paths (configured via tempo.readPaths, all rewritten: /tempo prefix removed):
+  /tempo/api/echo, /tempo/api/status/buildinfo, /tempo/api/metrics/query_range,
+  /tempo/api/search, /tempo/api/v2/search, /tempo/api/traces, /tempo/api/v2/traces
+*/}}
+{{- if and .Values.tempo.enabled .Values.auth.jwt.providers -}}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo-read-api
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  {{- with .Values.tempo.parentRefs }}
+  parentRefs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.tempo.hostname }}
+  hostnames:
+  - {{ tpl . $ | quote }}
+  {{- end }}
+  rules:
+  - backendRefs:
+    - name: tempo-query-frontend
+      namespace: {{ .Values.tempo.namespace }}
+      port: 3200
+    matches:
+    {{- range .Values.tempo.read.paths }}
+    - path:
+        type: PathPrefix
+        value: {{ . }}
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    {{- end }}
+    filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: {{ include "resource.default.name" . }}-tempo-rewrite
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set:
+        - name: X-Scope-OrgID
+          value: "%REQ(X-Scope-OrgID)%"
+  - backendRefs:
+    - name: tempo-query-frontend
+      namespace: {{ .Values.tempo.namespace }}
+      port: 3200
+    filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: {{ include "resource.default.name" . }}-tempo-headers-check
+    matches:
+    {{- range .Values.tempo.read.paths }}
+    - path:
+        type: PathPrefix
+        value: {{ . }}
+    {{- end }}
+{{- end }}

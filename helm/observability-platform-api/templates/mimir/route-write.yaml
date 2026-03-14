@@ -1,0 +1,110 @@
+{{/*
+Mimir write API routes (mimir.enabled=true)
+
+Resources:
+  - HTTPRoute: routes write requests to mimir-gateway:80 in mimir.namespace.
+    For each path in mimir.writeRewritePaths:
+      Rule (with header): matches path + X-Scope-OrgID header → rewrites path (strips /prometheus
+                          prefix) and forwards to backend.
+      Rule (no header):   matches path only → returns 401 via HTTPRouteFilter.
+    For each path in mimir.writePassthroughPaths:
+      Rule (with header): matches path + X-Scope-OrgID header → forwards to backend (no rewrite).
+      Rule (no header):   matches path only → returns 401 via HTTPRouteFilter.
+
+Exposed paths:
+  /prometheus/api/v1/push  (rewritten to /api/v1/push upstream; configured via mimir.writeRewritePaths)
+  /otlp/v1/metrics         (forwarded as-is; configured via mimir.writePassthroughPaths)
+*/}}
+{{- if and .Values.mimir.enabled .Values.auth.jwt.providers -}}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "resource.default.name" . }}-mimir-write-api
+  namespace: {{ .Values.mimir.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  {{- with .Values.mimir.parentRefs }}
+  parentRefs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.mimir.hostname }}
+  hostnames:
+  - {{ tpl . $ | quote }}
+  {{- end }}
+  rules:
+  {{- range .Values.mimir.write.stripPrefixPaths }}
+  - backendRefs:
+    - name: mimir-gateway
+      namespace: {{ $.Values.mimir.namespace }}
+      port: 80
+    matches:
+    - path:
+        type: PathPrefix
+        value: {{ . }}
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: {{ include "resource.default.name" $ }}-mimir-rewrite
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set:
+        - name: X-Scope-OrgID
+          value: "%REQ(X-Scope-OrgID)%"
+  - backendRefs:
+    - name: mimir-gateway
+      namespace: {{ $.Values.mimir.namespace }}
+      port: 80
+    filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: {{ include "resource.default.name" $ }}-mimir-headers-check
+    matches:
+    - path:
+        type: PathPrefix
+        value: {{ . }}
+  {{- end }}
+  {{- range .Values.mimir.write.paths }}
+  - backendRefs:
+    - name: mimir-gateway
+      namespace: {{ $.Values.mimir.namespace }}
+      port: 80
+    matches:
+    - path:
+        type: PathPrefix
+        value: {{ . }}
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    filters:
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set:
+        - name: X-Scope-OrgID
+          value: "%REQ(X-Scope-OrgID)%"
+  - backendRefs:
+    - name: mimir-gateway
+      namespace: {{ $.Values.mimir.namespace }}
+      port: 80
+    filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: {{ include "resource.default.name" $ }}-mimir-headers-check
+    matches:
+    - path:
+        type: PathPrefix
+        value: {{ . }}
+  {{- end }}
+{{- end }}

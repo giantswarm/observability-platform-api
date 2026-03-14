@@ -14,37 +14,136 @@ auth:
     #   issuer: "https://dex.mycluster.example.com"
     #   remoteJWKS:
     #     uri: "https://dex.mycluster.example.com/keys"
+    #   # Best practice: restrict JWT extraction to Bearer tokens only.
+    #   # This prevents the JWT filter from attempting to parse Basic Auth credentials
+    #   # as a JWT when both auth methods are enabled on the same route.
+    #   extractFrom:
+    #     headers:
+    #     - name: Authorization
+    #       valuePrefix: "Bearer "
     # - name: azure-ad
     #   issuer: "https://login.microsoftonline.com/<tenant-id>/v2.0"
     #   remoteJWKS:
     #     uri: "https://login.microsoftonline.com/<tenant-id>/discovery/v2.0/keys"
+    #   extractFrom:
+    #     headers:
+    #     - name: Authorization
+    #       valuePrefix: "Bearer "
 
 loki:
   enabled: false
   namespace: loki
-  # -- Hostname for all Loki routes. Supports Helm template strings.
   hostname: ""
   parentRefs:
   - name: giantswarm-default
     namespace: envoy-gateway-system
+  # -- HTTP read route configuration.
+  read:
+    # -- Paths exposed on the Loki read route. Each matched with PathPrefix and forwarded as-is to loki-gateway:80.
+    paths:
+    - /loki/api/v1/labels
+    - /loki/api/v1/label
+    - /loki/api/v1/rules
+    - /loki/api/v1/query
+    - /loki/api/v1/index
+    - /loki/api/v1/query_range
+    - /loki/api/v1/series
+    - /loki/api/v1/detected_labels
+    - /loki/api/v1/tail
+    - /loki/api/v1/format_query
+    - /loki/api/v1/index/stats
+    - /loki/api/v1/index/volume
+    - /loki/api/v1/index/volume_range
+    - /loki/api/v1/detected_fields
+    - /loki/api/v1/patterns
+  # -- HTTP write route configuration.
+  write:
+    # -- Paths forwarded as-is to loki-gateway:80.
+    paths:
+    - /loki/api/v1/push
+    - /otlp/v1/logs
+    # -- Paths whose leading prefix is stripped before forwarding (e.g. /loki/api/v1/push → /api/v1/push).
+    # Leave empty for Loki — loki-gateway handles the /loki prefix natively.
+    stripPrefixPaths: []
+    # -- gRPC OTLP ingestion. Routes directly to the Loki write component (bypasses the nginx
+    # gateway, which does not handle gRPC). Set backendService/backendPort to enable.
+    # Use loki-write for SimpleScalable mode (default); loki-distributor for microservices mode.
+    grpc:
+      backendService: loki-write
+      backendPort: 9095
 
 mimir:
   enabled: false
   namespace: mimir
-  # -- Hostname for all Mimir routes. Supports Helm template strings.
   hostname: ""
   parentRefs:
   - name: giantswarm-default
     namespace: envoy-gateway-system
+  # -- HTTP read route configuration.
+  read:
+    # -- Paths exposed on the Mimir read route. Each matched with PathPrefix and forwarded as-is to mimir-gateway:80.
+    paths:
+    - /prometheus/api/v1/labels
+    - /prometheus/api/v1/label
+    - /prometheus/api/v1/rules
+    - /prometheus/api/v1/query
+    - /prometheus/api/v1/query_exemplars
+    - /prometheus/api/v1/query_range
+    - /prometheus/api/v1/series
+    - /prometheus/api/v1/status
+    - /prometheus/api/v1/metadata
+    - /prometheus/api/v1/detected_labels
+  # -- HTTP write route configuration.
+  write:
+    # -- Paths forwarded as-is to mimir-gateway:80 (OTLP ingestion).
+    paths:
+    - /otlp/v1/metrics
+    # -- Paths whose leading /prometheus prefix is stripped before forwarding to mimir-gateway:80.
+    # Required because mimir-gateway's nginx routes remote_write at /api/v1/push (no /prometheus prefix),
+    # while the external API convention is /prometheus/api/v1/push.
+    stripPrefixPaths:
+    - /prometheus/api/v1/push
 
 tempo:
   enabled: false
   namespace: tempo
-  # -- Hostname for all Tempo routes. Supports Helm template strings.
   hostname: ""
   parentRefs:
   - name: giantswarm-default
     namespace: envoy-gateway-system
+  # -- HTTP read route configuration.
+  read:
+    # -- Paths exposed on the Tempo read route. Each matched with PathPrefix.
+    # The /tempo prefix is stripped before forwarding to tempo-query-frontend:3200
+    # (all paths in this list are subject to the prefix-strip rewrite).
+    paths:
+    - /tempo/api/echo
+    - /tempo/api/status/buildinfo
+    - /tempo/api/metrics/query_range
+    - /tempo/api/search
+    - /tempo/api/search/tags
+    - /tempo/api/v2/search
+    - /tempo/api/v2/search/tags
+    - /tempo/api/v2/search/tag/
+    - /tempo/api/traces
+    - /tempo/api/v2/traces
+    # -- gRPC read queries. Routes to tempo-query-frontend:9095.
+    # Matches any gRPC service matching regex "tempopb\.[^/]+".
+    grpc:
+      backendService: tempo-query-frontend
+      backendPort: 9095
+  # -- HTTP write route configuration.
+  write:
+    # -- Paths forwarded as-is to tempo-distributor:4318 (OTLP HTTP trace ingestion).
+    paths:
+    - /v1/traces
+    # -- No prefix stripping needed for Tempo write paths.
+    stripPrefixPaths: []
+    # -- gRPC OTLP trace ingestion. Routes directly to tempo-distributor:4317 (bypasses the nginx
+    # gateway, which does not handle gRPC). Set backendService/backendPort to enable.
+    grpc:
+      backendService: tempo-distributor
+      backendPort: 4317
 
 ingresses:
   - name: loki

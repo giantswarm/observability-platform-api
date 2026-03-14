@@ -1,0 +1,30 @@
+{{/*
+Loki SecurityPolicy (loki.enabled=true)
+
+Applies JWT to both Loki HTTPRoutes (read and write) and the GRPCRoute in a single policy.
+Auth is configured via auth.jwt.providers.
+*/}}
+{{- if and .Values.loki.enabled .Values.auth.jwt.providers -}}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: {{ include "resource.default.name" . }}-loki
+  namespace: {{ .Values.loki.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ include "resource.default.name" . }}-loki-read-api
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ include "resource.default.name" . }}-loki-write-api
+  - group: gateway.networking.k8s.io
+    kind: GRPCRoute
+    name: {{ include "resource.default.name" . }}-loki-write-api-grpc
+  jwt:
+    providers:
+      {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
+{{- end }}
