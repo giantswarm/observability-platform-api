@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Restructure per-service path configuration under nested `read` and `write` objects (e.g. `loki.read.paths`, `mimir.write.paths`).
+- Restructure Helm templates into per-service subdirectories (templates/loki/, templates/mimir/, templates/tempo/) with - Restructure Helm templates into per-service subdirectories (templates/loki/, templates/mimir/, templates/tempo/).
 - Rename `mimir.writeRewritePaths` → `mimir.write.stripPrefixPaths` to clarify that the `/prometheus` prefix is stripped before forwarding; add equivalent `stripPrefixPaths: []` defaults to loki and tempo write config.
 - Move `loki.otlpGrpc` → `loki.write.grpc` for consistency with `tempo.read.grpc`.
 - Expose Tempo gRPC backend config in values (`tempo.read.grpc.backendService`, `tempo.read.grpc.backendPort`) instead of hardcoding in the template.
