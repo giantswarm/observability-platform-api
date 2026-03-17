@@ -6,7 +6,7 @@ Resources:
     Rule 1: matches path + X-Scope-OrgID header (regex ^.+$) → forwards to backend.
     Rule 2: matches path only (no header) → returns 401 via HTTPRouteFilter.
 
-Exposed paths (configured via loki.readPaths):
+Exposed paths (configured via loki.read.paths):
   /loki/api/v1/labels, /loki/api/v1/label, /loki/api/v1/rules,
   /loki/api/v1/query, /loki/api/v1/query_range, /loki/api/v1/index,
   /loki/api/v1/series, /loki/api/v1/detected_labels
