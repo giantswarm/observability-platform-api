@@ -7,7 +7,7 @@ Resources:
       Rule (with header): matches path + X-Scope-OrgID header → forwards to backend.
       Rule (no header):   matches path only → returns 401 via HTTPRouteFilter.
 
-Exposed paths (configured via loki.writePaths):
+Exposed paths (configured via loki.write.paths):
   /loki/api/v1/push
   /otlp/v1/logs    (forwarded as-is; nginx gateway proxies to Loki OTLP ingest)
 */}}
