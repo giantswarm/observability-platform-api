@@ -9,8 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add configurable path lists to `values.yaml` (`loki.readPaths`, `loki.writePaths`, `mimir.readPaths`, `mimir.writeRewritePaths`, `mimir.writePassthroughPaths`, `tempo.readPaths`, `tempo.writePaths`).
-  Exposed API paths are now user-configurable and rendered via `range` loops, reducing template duplication.
+- Added new gRPC routes for Loki and Tempo write
 
 ### Changed
 
