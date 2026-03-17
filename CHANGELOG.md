@@ -19,7 +19,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move `loki.otlpGrpc` → `loki.write.grpc` for consistency with `tempo.read.grpc`.
 - Expose Tempo gRPC backend config in values (`tempo.read.grpc.backendService`, `tempo.read.grpc.backendPort`) instead of hardcoding in the template.
 - Restructure Helm templates into per-service subdirectories (`templates/loki/`, `templates/mimir/`, `templates/tempo/`).
-- Consolidate per-route `SecurityPolicy` resources: Loki and Mimir now use a single `SecurityPolicy` per service (covering both read and write routes). Tempo retains separate policies due to the distinct GRPCRoute.
 - Share `HTTPRouteFilter` resources within each service: a single `headers-check` filter and (for Mimir/Tempo) a single `rewrite` filter are now referenced by all routes in that service namespace.
 
 ## [0.3.0] - 2026-03-11
