@@ -62,9 +62,6 @@ loki:
     paths:
     - /loki/api/v1/push
     - /otlp/v1/logs
-    # -- Paths whose leading prefix is stripped before forwarding (e.g. /loki/api/v1/push → /api/v1/push).
-    # Leave empty for Loki — loki-gateway handles the /loki prefix natively.
-    stripPrefixPaths: []
     # -- gRPC OTLP ingestion. Routes directly to the Loki write component (bypasses the nginx
     # gateway, which does not handle gRPC). Set backendService/backendPort to enable.
     # Use loki-write for SimpleScalable mode (default); loki-distributor for microservices mode.
