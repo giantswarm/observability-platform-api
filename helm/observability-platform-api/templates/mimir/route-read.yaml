@@ -32,9 +32,9 @@ spec:
   {{- end }}
   rules:
   - backendRefs:
-    - name: mimir-gateway
+    - name: {{ .Values.mimir.read.backendService }}
       namespace: {{ .Values.mimir.namespace }}
-      port: 80
+      port: {{ .Values.mimir.read.backendPort }}
     matches:
     {{- range .Values.mimir.read.paths }}
     - path:
@@ -52,9 +52,9 @@ spec:
         - name: X-Scope-OrgID
           value: "%REQ(X-Scope-OrgID)%"
   - backendRefs:
-    - name: mimir-gateway
+    - name: {{ .Values.mimir.read.backendService }}
       namespace: {{ .Values.mimir.namespace }}
-      port: 80
+      port: {{ .Values.mimir.read.backendPort }}
     filters:
     - type: ExtensionRef
       extensionRef:

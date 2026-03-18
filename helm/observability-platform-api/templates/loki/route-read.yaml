@@ -31,9 +31,9 @@ spec:
   {{- end }}
   rules:
   - backendRefs:
-    - name: loki-gateway
+    - name: {{ .Values.loki.read.backendService }}
       namespace: {{ .Values.loki.namespace }}
-      port: 80
+      port: {{ .Values.loki.read.backendPort }}
     matches:
     {{- range .Values.loki.read.paths }}
     - path:
@@ -51,9 +51,9 @@ spec:
         - name: X-Scope-OrgID
           value: "%REQ(X-Scope-OrgID)%"
   - backendRefs:
-    - name: loki-gateway
+    - name: {{ .Values.loki.read.backendService }}
       namespace: {{ .Values.loki.namespace }}
-      port: 80
+      port: {{ .Values.loki.read.backendPort }}
     filters:
     - type: ExtensionRef
       extensionRef:
