@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added new gRPC routes for Loki and Tempo write
+
+### Changed
+
+- Rename `mimir.writeRewritePaths` → `mimir.write.stripPrefixPaths` to clarify that the `/prometheus` prefix is stripped before forwarding; add equivalent `stripPrefixPaths: []` defaults to loki and tempo write config.
+- Expose Tempo gRPC backend config in values (`tempo.read.grpc.backendService`, `tempo.read.grpc.backendPort`) instead of hardcoding in the template.
+- Restructure Helm templates into per-service subdirectories (`templates/loki/`, `templates/mimir/`, `templates/tempo/`).
+- Share `HTTPRouteFilter` resources within each service: a single `headers-check` filter and (for Mimir/Tempo) a single `rewrite` filter are now referenced by all routes in that service namespace.
+
 ## [0.3.0] - 2026-03-11
 
 ### Added

@@ -1,0 +1,66 @@
+{{/*
+Tempo OTLP write routes (tempo.enabled=true)
+
+Resources:
+  - HTTPRoute (tempo-otlp-write-api): routes OTLP trace ingestion to tempo-distributor:4318.
+    For each path in tempo.writePaths:
+      Rule (with header): matches path + X-Scope-OrgID header → forwards to backend.
+      Rule (no header):   matches path only → returns 401 via HTTPRouteFilter.
+
+Exposed paths (configured via tempo.writePaths):
+  /v1/traces  (OTLP HTTP trace ingestion)
+*/}}
+{{- if and .Values.tempo.enabled .Values.auth.jwt.providers -}}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo-otlp-write-api
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  {{- with .Values.tempo.parentRefs }}
+  parentRefs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.tempo.hostname }}
+  hostnames:
+  - {{ tpl . $ | quote }}
+  {{- end }}
+  rules:
+  {{- range .Values.tempo.write.paths }}
+  - backendRefs:
+    - name: tempo-distributor
+      namespace: {{ $.Values.tempo.namespace }}
+      port: 4318
+    matches:
+    - path:
+        type: PathPrefix
+        value: {{ . }}
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    filters:
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set:
+        - name: X-Scope-OrgID
+          value: "%REQ(X-Scope-OrgID)%"
+  - backendRefs:
+    - name: tempo-distributor
+      namespace: {{ $.Values.tempo.namespace }}
+      port: 4318
+    filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: {{ include "resource.default.name" $ }}-tempo-headers-check
+    matches:
+    - path:
+        type: PathPrefix
+        value: {{ . }}
+  {{- end }}
+{{- end }}

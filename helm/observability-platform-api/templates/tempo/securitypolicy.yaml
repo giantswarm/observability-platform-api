@@ -1,0 +1,34 @@
+{{/*
+Tempo SecurityPolicy (tempo.enabled=true)
+
+Applies JWT to all Tempo routes (read HTTPRoute, read GRPCRoute, OTLP write HTTPRoute,
+write GRPCRoute) in a single policy.
+Auth is configured via auth.jwt.providers.
+*/}}
+{{- if and .Values.tempo.enabled .Values.auth.jwt.providers -}}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ include "resource.default.name" . }}-tempo-read-api
+  - group: gateway.networking.k8s.io
+    kind: GRPCRoute
+    name: {{ include "resource.default.name" . }}-tempo-read-api-grpc
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ include "resource.default.name" . }}-tempo-otlp-write-api
+  - group: gateway.networking.k8s.io
+    kind: GRPCRoute
+    name: {{ include "resource.default.name" . }}-tempo-write-api-grpc
+  jwt:
+    providers:
+      {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
+{{- end }}
