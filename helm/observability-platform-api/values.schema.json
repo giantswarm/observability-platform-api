@@ -27,7 +27,6 @@
                     "type": "object",
                     "properties": {
                         "paths": { "type": "array", "items": { "type": "string" } },
-                        "stripPrefixPaths": { "type": "array", "items": { "type": "string" } },
                         "grpc": {
                             "type": "object",
                             "properties": {
