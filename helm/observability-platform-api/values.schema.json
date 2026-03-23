@@ -7,9 +7,49 @@
             "properties": {
                 "jwt": {
                     "type": "object",
+                    "description": "JWT validation config for all routes. Supports multiple OIDC providers.",
                     "properties": {
                         "providers": {
-                            "type": "array"
+                            "type": "array",
+                            "description": "List of trusted JWT providers. Required when any service is enabled.",
+                            "items": {
+                                "type": "object",
+                                "required": ["name", "issuer", "remoteJWKS"],
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "issuer": {
+                                        "type": "string"
+                                    },
+                                    "remoteJWKS": {
+                                        "type": "object",
+                                        "properties": {
+                                            "uri": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    },
+                                    "extractFrom": {
+                                        "type": "object",
+                                        "description": "Restrict where the JWT is extracted from. Best practice: set headers[].valuePrefix to 'Bearer ' so that Basic Auth credentials on the Authorization header are not mistakenly parsed as a JWT.",
+                                        "properties": {
+                                            "headers": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "name": { "type": "string" },
+                                                        "valuePrefix": { "type": "string" }
+                                                    }
+                                                }
+                                            },
+                                            "cookies": { "type": "array", "items": { "type": "string" } },
+                                            "params": { "type": "array", "items": { "type": "string" } }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
