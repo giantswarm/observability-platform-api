@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Rename `mimir.writeRewritePaths` → `mimir.write.stripPrefixPaths` to clarify that the `/prometheus` prefix is stripped before forwarding; add equivalent `stripPrefixPaths: []` defaults to loki and tempo write config.
 - Expose Tempo gRPC backend config in values (`tempo.read.grpc.backendService`, `tempo.read.grpc.backendPort`) instead of hardcoding in the template.
+- Expose Loki and Mimir backend config in values (`loki.read.backendService`, `loki.read.backendPort`, `loki.write.backendService`, `loki.write.backendPort`, `mimir.read.backendService`, `mimir.read.backendPort`, `mimir.write.backendService`, `mimir.write.backendPort`) instead of hardcoding in the template.
 - Restructure Helm templates into per-service subdirectories (`templates/loki/`, `templates/mimir/`, `templates/tempo/`).
 - Share `HTTPRouteFilter` resources within each service: a single `headers-check` filter and (for Mimir/Tempo) a single `rewrite` filter are now referenced by all routes in that service namespace.
 

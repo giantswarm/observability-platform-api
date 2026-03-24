@@ -36,9 +36,9 @@ spec:
   rules:
   {{- range .Values.mimir.write.stripPrefixPaths }}
   - backendRefs:
-    - name: mimir-gateway
+    - name: {{ $.Values.mimir.write.backendService }}
       namespace: {{ $.Values.mimir.namespace }}
-      port: 80
+      port: {{ $.Values.mimir.write.backendPort }}
     matches:
     - path:
         type: PathPrefix
@@ -59,9 +59,9 @@ spec:
         - name: X-Scope-OrgID
           value: "%REQ(X-Scope-OrgID)%"
   - backendRefs:
-    - name: mimir-gateway
+    - name: {{ $.Values.mimir.write.backendService }}
       namespace: {{ $.Values.mimir.namespace }}
-      port: 80
+      port: {{ $.Values.mimir.write.backendPort }}
     filters:
     - type: ExtensionRef
       extensionRef:
@@ -75,9 +75,9 @@ spec:
   {{- end }}
   {{- range .Values.mimir.write.paths }}
   - backendRefs:
-    - name: mimir-gateway
+    - name: {{ $.Values.mimir.write.backendService }}
       namespace: {{ $.Values.mimir.namespace }}
-      port: 80
+      port: {{ $.Values.mimir.write.backendPort }}
     matches:
     - path:
         type: PathPrefix
@@ -93,9 +93,9 @@ spec:
         - name: X-Scope-OrgID
           value: "%REQ(X-Scope-OrgID)%"
   - backendRefs:
-    - name: mimir-gateway
+    - name: {{ $.Values.mimir.write.backendService }}
       namespace: {{ $.Values.mimir.namespace }}
-      port: 80
+      port: {{ $.Values.mimir.write.backendPort }}
     filters:
     - type: ExtensionRef
       extensionRef:
