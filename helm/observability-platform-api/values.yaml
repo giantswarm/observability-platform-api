@@ -72,9 +72,8 @@ loki:
     grpc:
       backendService: loki-write
       backendPort: 9095
-    # -- Mirror accepted writes to a second backend, on top of the normal forward.
-    # Envoy discards the mirror's response, so the primary write path is unaffected.
-    # A ReferenceGrant is required when backendRef is in another namespace.
+    # -- Mirror accepted writes to a second backend, fire-and-forget. A cross-namespace
+    # backendRef needs a ReferenceGrant in the target namespace.
     requestMirror:
       enabled: false
       backendRef:
