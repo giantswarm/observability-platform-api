@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add `loki.write.requestMirror`, an optional Envoy `RequestMirror` filter on the Loki write route that tees accepted writes to a second backend. Disabled by default; when enabled it is added to the header-matching rule only, so rejected requests are not mirrored.
+- Add `loki.write.requestMirror`, an optional `RequestMirror` filter on the Loki write route. Disabled by default.
 
 ## [0.4.0] - 2026-03-24
 
