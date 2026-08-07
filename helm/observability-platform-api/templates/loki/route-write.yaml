@@ -59,9 +59,6 @@ spec:
     */}}
     - type: RequestMirror
       requestMirror:
-        {{- with .percent }}
-        percent: {{ . }}
-        {{- end }}
         backendRef:
           {{- toYaml .backendRef | nindent 10 }}
     {{- end }}

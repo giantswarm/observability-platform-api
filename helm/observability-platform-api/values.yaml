@@ -77,8 +77,6 @@ loki:
     # A ReferenceGrant is required when backendRef is in another namespace.
     requestMirror:
       enabled: false
-      # -- Share of requests to mirror, 0-100. Omit for all of them.
-      percent: null
       backendRef:
         name: alloy-logexporter
         namespace: monitoring
