@@ -72,6 +72,17 @@ loki:
     grpc:
       backendService: loki-write
       backendPort: 9095
+    # -- Mirror accepted writes to a second backend, on top of the normal forward.
+    # Envoy discards the mirror's response, so the primary write path is unaffected.
+    # A ReferenceGrant is required when backendRef is in another namespace.
+    requestMirror:
+      enabled: false
+      # -- Share of requests to mirror, 0-100. Omit for all of them.
+      percent: null
+      backendRef:
+        name: alloy-logexporter
+        namespace: monitoring
+        port: 3100
 
 mimir:
   enabled: false

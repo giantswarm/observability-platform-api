@@ -49,6 +49,23 @@ spec:
         set:
         - name: X-Scope-OrgID
           value: "%REQ(X-Scope-OrgID)%"
+    {{- with $.Values.loki.write.requestMirror }}
+    {{- if .enabled }}
+    {{- /*
+      Mirror accepted writes to a second backend, fire-and-forget: Envoy always
+      ignores the mirror's response, so this cannot affect the primary path. Only on
+      this rule -- the rule below returns 401 for requests without an X-Scope-OrgID
+      header, and mirroring those would copy only rejected requests.
+    */}}
+    - type: RequestMirror
+      requestMirror:
+        {{- with .percent }}
+        percent: {{ . }}
+        {{- end }}
+        backendRef:
+          {{- toYaml .backendRef | nindent 10 }}
+    {{- end }}
+    {{- end }}
   - backendRefs:
     - name: {{ $.Values.loki.write.backendService }}
       namespace: {{ $.Values.loki.namespace }}
