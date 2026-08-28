@@ -1,0 +1,39 @@
+{{/*
+ReferenceGrant for the Basic Auth users Secret (basicAuth.enabled=true)
+
+The users Secret lives outside the mimir/loki namespaces so that a single
+object holds the credentials for every service, and so that write access to it
+can be delegated without granting access to a service namespace. Envoy Gateway
+resolves SecurityPolicy secret references across namespaces only when a
+ReferenceGrant permits it.
+*/}}
+{{- if eq (include "basicauth.configured" .) "true" -}}
+{{- $namespaces := list }}
+{{- range $name := list "mimir" "loki" }}
+{{- $service := index $.Values $name }}
+{{- if $service.enabled }}
+{{- $namespaces = append $namespaces $service.namespace }}
+{{- end }}
+{{- end }}
+{{- if $namespaces }}
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: {{ include "resource.default.name" . }}-basicauth-users
+  namespace: {{ .Values.basicAuth.usersSecret.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  from:
+  {{- range $namespaces | uniq | sortAlpha }}
+  - group: gateway.envoyproxy.io
+    kind: SecurityPolicy
+    namespace: {{ . }}
+  {{- end }}
+  to:
+  - group: ""
+    kind: Secret
+    name: {{ .Values.basicAuth.usersSecret.name }}
+{{- end }}
+{{- end }}

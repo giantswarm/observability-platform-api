@@ -7,6 +7,7 @@ This document describes how to configure and test all exposed routes (Loki, Mimi
 - Access to a management cluster with the app deployed
 - `curl` and `jq` installed
 - `grpcurl` installed (for Tempo and Loki gRPC testing)
+- `yq` and `htpasswd` installed (for the Basic Auth section)
 - An Azure AD app registration with a client secret, or a Dex OIDC client
 
 ## 1. Helm template check
@@ -451,4 +452,147 @@ for NS_NAME in \
   echo "$NS_NAME → ${STATUS:-NOT FOUND}"
 done
 # expect: True for all
+```
+
+## 6. Basic Auth read routes
+
+Only relevant when `basicAuth.enabled` is set. These routes serve the Mimir and
+Loki read paths on `basicAuth.hostname` behind HTTP Basic Auth instead of a JWT.
+
+### Helm template check
+
+`ci/test-values.yaml` enables the feature, so the default render already covers it:
+
+```bash
+helm template observability-platform-api ./helm/observability-platform-api \
+  -f helm/observability-platform-api/ci/test-values.yaml \
+  | grep -E '^kind:|^  name:' | paste - - | grep -i basicauth
+# expect: 2 HTTPRoute, 2 HTTPRouteFilter, 1 ReferenceGrant, 2 SecurityPolicy
+
+# The Basic Auth SecurityPolicies must carry basicAuth and NOT jwt — the two
+# cannot coexist on one route (envoyproxy/gateway#8491).
+helm template observability-platform-api ./helm/observability-platform-api \
+  -f helm/observability-platform-api/ci/test-values.yaml \
+  | yq 'select(.kind == "SecurityPolicy" and (.metadata.name | test("basicauth"))) | {"name": .metadata.name, "jwt": (.spec.jwt // "absent"), "basicAuth": (.spec.basicAuth.users.name)}'
+# expect: jwt absent on both
+
+# Write paths and Tempo must not appear on the Basic Auth hostname.
+helm template observability-platform-api ./helm/observability-platform-api \
+  -f helm/observability-platform-api/ci/test-values.yaml \
+  | yq 'select(.kind == "HTTPRoute" and (.metadata.name | test("basicauth"))) | .spec.rules[].matches[].path.value' \
+  | grep -v '^---' | sort -u
+# expect: only mimir/loki read paths
+```
+
+Incomplete configuration must render nothing:
+
+```bash
+for override in basicAuth.hostname basicAuth.usersSecret.name basicAuth.usersSecret.namespace; do
+  COUNT=$(helm template observability-platform-api ./helm/observability-platform-api \
+    -f helm/observability-platform-api/ci/test-values.yaml \
+    --set $override="" | grep -ci basicauth)
+  echo "$override empty → $COUNT basicauth resources"
+done
+# expect: 0 for all three
+```
+
+### Create the users Secret
+
+The chart does not create it. For a test credential:
+
+```bash
+NS="monitoring"   # basicAuth.usersSecret.namespace
+PASSWORD=$(openssl rand -base64 32)
+ENTRY=$(htpasswd -nbs test-grafana-1 "$PASSWORD")
+
+kubectl create secret generic observability-basicauth-users \
+  -n "$NS" --from-literal=.htpasswd="$ENTRY"
+
+echo "user: test-grafana-1"
+echo "password: $PASSWORD"
+```
+
+> Only the `{SHA}` scheme works — `htpasswd` without `-s` produces bcrypt, which
+> Envoy rejects. Verify the entry starts with `test-grafana-1:{SHA}`.
+
+The Secret can be created before or after the chart. While it is missing, the
+routes return `500` (Envoy Gateway fails closed); they start serving within a
+reconcile of the Secret appearing, with no redeploy.
+
+### Test variables
+
+```bash
+BA_BASE="https://observability-basicauth.<codename>.<base-domain>"
+BA_USER="test-grafana-1"
+BA_PASS="<password from above>"
+ORG="my-tenant"
+SCOPE="X-Scope-OrgID: $ORG"
+```
+
+### Scenarios
+
+| Scenario | Expected |
+|----------|----------|
+| Valid Basic credentials + `X-Scope-OrgID` present | 2xx (backend response) |
+| Valid Basic credentials, `X-Scope-OrgID` missing | 401 |
+| No credential | 401 |
+| Wrong password | 401 |
+| Valid JWT (Bearer) instead of Basic | 401 — this hostname only accepts Basic |
+| Valid Basic credentials against a *write* path | 404 — write paths are not exposed here |
+
+```bash
+# Mimir read
+curl -si -u "$BA_USER:$BA_PASS" "$BA_BASE/prometheus/api/v1/labels" -H "$SCOPE"   # expect 2xx
+curl -si -u "$BA_USER:$BA_PASS" "$BA_BASE/prometheus/api/v1/labels"                # expect 401
+curl -si "$BA_BASE/prometheus/api/v1/labels" -H "$SCOPE"                           # expect 401
+curl -si -u "$BA_USER:wrong" "$BA_BASE/prometheus/api/v1/labels" -H "$SCOPE"       # expect 401
+
+# Loki read
+curl -si -u "$BA_USER:$BA_PASS" "$BA_BASE/loki/api/v1/labels" -H "$SCOPE"          # expect 2xx
+
+# Write paths must not be reachable on this hostname
+curl -si -u "$BA_USER:$BA_PASS" -X POST "$BA_BASE/prometheus/api/v1/push" -H "$SCOPE"  # expect 404
+curl -si -u "$BA_USER:$BA_PASS" -X POST "$BA_BASE/loki/api/v1/push" -H "$SCOPE"        # expect 404
+
+# The JWT hostname must be unaffected — Basic credentials rejected there
+curl -si -u "$BA_USER:$BA_PASS" "$BASE/prometheus/api/v1/labels" -H "$SCOPE"       # expect 401
+curl -si "$BASE/prometheus/api/v1/labels" -H "$AUTH" -H "$SCOPE"                   # expect 2xx
+```
+
+The last two matter most: they confirm the Basic Auth route set did not weaken
+or disturb the JWT routes.
+
+### Rotation
+
+Adding a second entry must not interrupt the first:
+
+```bash
+NS="monitoring"
+PASSWORD2=$(openssl rand -base64 32)
+CURRENT=$(kubectl get secret observability-basicauth-users -n "$NS" -o jsonpath='{.data.\.htpasswd}' | base64 -d)
+NEW=$(printf '%s\n%s\n' "$CURRENT" "$(htpasswd -nbs test-grafana-2 "$PASSWORD2")")
+
+kubectl create secret generic observability-basicauth-users \
+  -n "$NS" --from-literal=.htpasswd="$NEW" --dry-run=client -o yaml | kubectl apply -f -
+
+# Both credentials must work
+curl -si -u "test-grafana-1:$BA_PASS"  "$BA_BASE/prometheus/api/v1/labels" -H "$SCOPE"  # expect 2xx
+curl -si -u "test-grafana-2:$PASSWORD2" "$BA_BASE/prometheus/api/v1/labels" -H "$SCOPE" # expect 2xx
+```
+
+### Verify SecurityPolicy and ReferenceGrant in-cluster
+
+```bash
+RELEASE="observability-platform-api"
+for NS_NAME in "loki/$RELEASE-loki-basicauth" "mimir/$RELEASE-mimir-basicauth"; do
+  NS=$(echo $NS_NAME | cut -d/ -f1)
+  NAME=$(echo $NS_NAME | cut -d/ -f2)
+  STATUS=$(kubectl get securitypolicy -n $NS $NAME -o json 2>/dev/null \
+    | jq -r '(.status.ancestors // [])[].conditions[] | select(.type=="Accepted") | .status')
+  echo "$NS_NAME → ${STATUS:-NOT FOUND}"
+done
+# expect: True for both
+
+# A missing ReferenceGrant shows up here as "does not exist" on the secret ref
+kubectl get referencegrant -n monitoring $RELEASE-basicauth-users -o yaml
 ```

@@ -55,6 +55,35 @@
                 }
             }
         },
+        "basicAuth": {
+            "type": "object",
+            "description": "Read-only Basic Auth routes for Mimir and Loki, exposed on a dedicated hostname. Stopgap for clients that cannot present an OIDC token; see envoyproxy/gateway#8491.",
+            "properties": {
+                "enabled": { "type": "boolean" },
+                "hostname": {
+                    "type": "string",
+                    "description": "Hostname for the Basic Auth read routes. Must differ from the per-service hostname used by the JWT routes."
+                },
+                "parentRefs": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": { "type": "string" },
+                            "namespace": { "type": "string" }
+                        }
+                    }
+                },
+                "usersSecret": {
+                    "type": "object",
+                    "description": "Existing Secret holding the htpasswd entries under the .htpasswd key. Not created or managed by this chart.",
+                    "properties": {
+                        "name": { "type": "string" },
+                        "namespace": { "type": "string" }
+                    }
+                }
+            }
+        },
         "ingresses": {
             "type": "array",
             "items": {

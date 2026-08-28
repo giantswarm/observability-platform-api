@@ -6,6 +6,15 @@ auth:
       remoteJWKS:
         uri: "https://login.microsoftonline.com/my-tenant/discovery/v2.0/keys"
 
+basicAuth:
+  enabled: true
+  hostname: "observability-basicauth.test.example.com"
+  parentRefs:
+  - name: giantswarm-default
+    namespace: envoy-gateway-system
+  usersSecret:
+    name: observability-basicauth-users
+
 loki:
   enabled: true
   hostname: "observability.test.example.com"
