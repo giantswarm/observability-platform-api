@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-31
+
 ### Added
 
 - Add `loki.write.requestMirror`, an optional `RequestMirror` filter on the Loki write route. Disabled by default.
@@ -74,7 +76,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add ingress template
 - skaffolding of the application template
 
-[Unreleased]: https://github.com/giantswarm/observability-platform-api/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/giantswarm/observability-platform-api/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/giantswarm/observability-platform-api/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/giantswarm/observability-platform-api/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/giantswarm/observability-platform-api/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/giantswarm/observability-platform-api/compare/v0.1.2...v0.2.0
