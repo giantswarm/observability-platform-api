@@ -62,7 +62,7 @@
                 "enabled": { "type": "boolean" },
                 "hostname": {
                     "type": "string",
-                    "description": "Hostname for the Basic Auth read routes. Must differ from the per-service hostname used by the JWT routes."
+                    "description": "Hostname for the Basic Auth read routes. Must differ from the per-service hostname used by the JWT routes, because Envoy Gateway cannot accept both authentication methods on one route. See docs/basic-auth.md."
                 },
                 "parentRefs": {
                     "type": "array",

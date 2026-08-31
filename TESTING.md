@@ -505,7 +505,7 @@ NS="monitoring"   # basicAuth.usersSecret.namespace
 PASSWORD=$(openssl rand -base64 32)
 ENTRY=$(htpasswd -nbs test-grafana-1 "$PASSWORD")
 
-kubectl create secret generic observability-basicauth-users \
+kubectl create secret generic observability-platform-api-basic-auth-credentials \
   -n "$NS" --from-literal=.htpasswd="$ENTRY"
 
 echo "user: test-grafana-1"
@@ -569,10 +569,10 @@ Adding a second entry must not interrupt the first:
 ```bash
 NS="monitoring"
 PASSWORD2=$(openssl rand -base64 32)
-CURRENT=$(kubectl get secret observability-basicauth-users -n "$NS" -o jsonpath='{.data.\.htpasswd}' | base64 -d)
+CURRENT=$(kubectl get secret observability-platform-api-basic-auth-credentials -n "$NS" -o jsonpath='{.data.\.htpasswd}' | base64 -d)
 NEW=$(printf '%s\n%s\n' "$CURRENT" "$(htpasswd -nbs test-grafana-2 "$PASSWORD2")")
 
-kubectl create secret generic observability-basicauth-users \
+kubectl create secret generic observability-platform-api-basic-auth-credentials \
   -n "$NS" --from-literal=.htpasswd="$NEW" --dry-run=client -o yaml | kubectl apply -f -
 
 # Both credentials must work

@@ -12,8 +12,6 @@ basicAuth:
   parentRefs:
   - name: giantswarm-default
     namespace: envoy-gateway-system
-  usersSecret:
-    name: observability-basicauth-users
 
 loki:
   enabled: true
