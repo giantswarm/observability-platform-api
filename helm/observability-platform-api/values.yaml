@@ -72,6 +72,18 @@ loki:
     grpc:
       backendService: loki-write
       backendPort: 9095
+    # -- Mirror accepted writes to a second backend, fire-and-forget. A cross-namespace
+    # backendRef needs a ReferenceGrant in the target namespace; this chart does not
+    # create one. The loki chart's own requestMirror does, and because a grant's
+    # spec.from is namespace-scoped, that single grant also covers this route — both
+    # live in `loki.namespace`. Enabling the mirror here alone leaves the route
+    # ResolvedRefs=False.
+    requestMirror:
+      enabled: false
+      backendRef:
+        name: alloy-logexporter
+        namespace: monitoring
+        port: 3100
 
 mimir:
   enabled: false

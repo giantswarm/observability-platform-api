@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add `loki.write.requestMirror`, an optional `RequestMirror` filter on the Loki write route. Disabled by default.
+
 ## [0.4.0] - 2026-03-24
 
 ### Added

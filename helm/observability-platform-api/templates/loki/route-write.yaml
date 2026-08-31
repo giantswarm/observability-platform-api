@@ -49,6 +49,16 @@ spec:
         set:
         - name: X-Scope-OrgID
           value: "%REQ(X-Scope-OrgID)%"
+    {{- with $.Values.loki.write.requestMirror }}
+    {{- if .enabled }}
+    {{- /* This rule only: the one below returns 401 for requests without an
+           X-Scope-OrgID header, so mirroring it would copy only rejections. */}}
+    - type: RequestMirror
+      requestMirror:
+        backendRef:
+          {{- toYaml .backendRef | nindent 10 }}
+    {{- end }}
+    {{- end }}
   - backendRefs:
     - name: {{ $.Values.loki.write.backendService }}
       namespace: {{ $.Values.loki.namespace }}
