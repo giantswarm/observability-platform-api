@@ -1,0 +1,36 @@
+{{/*
+Basic Auth SecurityPolicies (basicAuth.enabled=true)
+
+One SecurityPolicy per enabled service, targeting only that service's Basic
+Auth HTTPRoute and configuring `basicAuth` alone.
+
+These are deliberately separate from the JWT SecurityPolicies rather than a
+`basicAuth` block added to them: Envoy Gateway runs the jwt and basicAuth
+filters sequentially with AND semantics, so a route carrying both rejects
+every request regardless of which credential it presents
+(https://github.com/envoyproxy/gateway/issues/8491).
+*/}}
+{{- if eq (include "basicauth.configured" .) "true" -}}
+{{- range $name := list "mimir" "loki" }}
+{{- $service := index $.Values $name }}
+{{- if $service.enabled }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: {{ include "resource.default.name" $ }}-{{ $name }}-basicauth
+  namespace: {{ $service.namespace }}
+  labels:
+    {{- include "labels.common" $ | nindent 4 }}
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ include "resource.default.name" $ }}-{{ $name }}-read-api-basicauth
+  basicAuth:
+    users:
+      name: {{ $.Values.basicAuth.usersSecret.name }}
+      namespace: {{ $.Values.basicAuth.usersSecret.namespace }}
+{{- end }}
+{{- end }}
+{{- end }}

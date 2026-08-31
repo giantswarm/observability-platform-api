@@ -34,6 +34,8 @@ This repository contains the Helm chart and configuration templates for creating
 
 The observability-platform-api creates `HTTPRoute` and `GRPCRoute` resources under a unified domain for direct access to observability backends. Each route is secured by an Envoy Gateway `SecurityPolicy` (JWT) and enforces the `X-Scope-OrgID` tenant header.
 
+The table below describes the JWT domain. When `basicAuth.enabled` is set, the Mimir and Loki read rows are additionally served on `basicAuth.hostname` behind Basic Auth.
+
 ```
 ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                              Domain: https://observability.<codename>.<base-domain>                                           │
@@ -95,6 +97,8 @@ All routes (read and write) require JWT Bearer token authentication via Envoy Ga
 
 All routes additionally enforce that the `X-Scope-OrgID` header is present and non-empty — requests missing it receive a `401`.
 
+Optionally, the Mimir and Loki *read* paths can additionally be exposed on a second hostname behind HTTP Basic Auth, for clients that cannot obtain an OIDC token — see [Basic Auth read routes](docs/basic-auth.md). This is disabled by default.
+
 #### Configuring JWT providers
 
 Set `auth.jwt.providers` to the list of trusted OIDC issuers. JWT validation is done inline by Envoy Gateway against the issuer's JWKS endpoint — no external auth service required.
@@ -154,6 +158,7 @@ This app creates multiple `HTTPRoute` and `GRPCRoute` resources (one per service
 
 ### User Documentation
 
+- [**Basic Auth read routes**](docs/basic-auth.md) - Optional Basic Auth hostname for Mimir and Loki reads: configuration, credential format, rotation
 - [**Data Import/Export Guide**](https://docs.giantswarm.io/overview/observability/data-management/data-import-export/) - Public API documentation and usage examples
 - [**Intranet Documentation**](https://intranet.giantswarm.io/docs/observability/gateway/) - Internal operational guides
 

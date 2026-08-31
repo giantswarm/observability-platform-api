@@ -30,6 +30,38 @@ auth:
     #     - name: Authorization
     #       valuePrefix: "Bearer "
 
+# -- Read-only Basic Auth routes, exposed on a dedicated hostname.
+#
+# Allow external clients (e.g. Grafana) to query Mimir and/or Loki using the
+# basic authentication mechanism.
+#
+# Only Mimir and Loki *read* paths are exposed. Write paths and Tempo stay
+# JWT-only.
+basicAuth:
+  # -- Enable the Basic Auth read routes.
+  enabled: false
+  # -- Hostname for the Basic Auth read routes. Must differ from the per-service
+  # `hostname` used by the JWT routes, because Envoy Gateway cannot accept both
+  # authentication methods on one route — see docs/basic-auth.md. Must be covered
+  # by a listener on the parent Gateway. Supports Helm template strings.
+  hostname: ""
+  # -- Parent Gateway for the Basic Auth routes.
+  parentRefs:
+  - name: giantswarm-default
+    namespace: envoy-gateway-system
+  # -- Existing Secret holding the htpasswd entries under the `.htpasswd` key.
+  #
+  # This chart does not create, template or manage this Secret. It is
+  # provisioned and rotated out of band by whoever owns the credentials, so that
+  # no password or password hash ever passes through this chart's values. See
+  # docs/basic-auth.md for the required format.
+  usersSecret:
+    # -- Name of the existing Secret.
+    name: "observability-platform-api-basic-auth-credentials"
+    # -- Namespace of the existing Secret. A ReferenceGrant is rendered so the
+    # per-service SecurityPolicies can read it across namespaces.
+    namespace: "monitoring"
+
 loki:
   enabled: false
   namespace: loki

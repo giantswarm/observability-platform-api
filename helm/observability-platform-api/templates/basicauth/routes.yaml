@@ -1,0 +1,75 @@
+{{/*
+Basic Auth read routes (basicAuth.enabled=true)
+
+One HTTPRoute per enabled service (Mimir, Loki) exposing that service's
+existing read paths on basicAuth.hostname. The paths, backend service and
+backend port are reused from <service>.read so the two hostnames never drift
+apart — the only difference between these routes and the JWT ones is the
+hostname they answer on and the SecurityPolicy attached to them.
+
+Rule 1: matches path + X-Scope-OrgID header (regex ^.+$) -> forwards to backend.
+Rule 2: matches path only (no header) -> returns 401 via HTTPRouteFilter.
+
+The headers-check HTTPRouteFilter is this directory's own (see filters.yaml),
+not the one used by the JWT routes, so the feature can be removed without
+touching any existing template.
+*/}}
+{{- if eq (include "basicauth.configured" .) "true" -}}
+{{- range $name := list "mimir" "loki" }}
+{{- $service := index $.Values $name }}
+{{- if $service.enabled }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "resource.default.name" $ }}-{{ $name }}-read-api-basicauth
+  namespace: {{ $service.namespace }}
+  labels:
+    {{- include "labels.common" $ | nindent 4 }}
+spec:
+  {{- with $.Values.basicAuth.parentRefs }}
+  parentRefs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  hostnames:
+  - {{ tpl $.Values.basicAuth.hostname $ | quote }}
+  rules:
+  - backendRefs:
+    - name: {{ $service.read.backendService }}
+      namespace: {{ $service.namespace }}
+      port: {{ $service.read.backendPort }}
+    matches:
+    {{- range $service.read.paths }}
+    - path:
+        type: PathPrefix
+        value: {{ . }}
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    {{- end }}
+    filters:
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set:
+        - name: X-Scope-OrgID
+          value: "%REQ(X-Scope-OrgID)%"
+  - backendRefs:
+    - name: {{ $service.read.backendService }}
+      namespace: {{ $service.namespace }}
+      port: {{ $service.read.backendPort }}
+    filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: {{ include "resource.default.name" $ }}-{{ $name }}-basicauth-headers-check
+    matches:
+    {{- range $service.read.paths }}
+    - path:
+        type: PathPrefix
+        value: {{ . }}
+    {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

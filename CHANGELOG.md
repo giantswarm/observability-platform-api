@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add `loki.write.requestMirror`, an optional `RequestMirror` filter on the Loki write route. Disabled by default.
+- Add opt-in Basic Auth read routes for Mimir and Loki on a dedicated hostname (`basicAuth.*`, disabled by default).
 
 ## [0.4.0] - 2026-03-24
 
