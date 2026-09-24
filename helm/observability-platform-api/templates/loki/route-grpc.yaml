@@ -1,22 +1,23 @@
 {{/*
-Loki gRPC OTLP write route (loki.enabled=true)
+Loki gRPC OTLP write route (loki.enabled=true and loki.write.grpc.backendService set)
 
 Resources:
-  - GRPCRoute (loki-write-api-grpc): routes gRPC OTLP log ingestion to loki-distributor:9095.
+  - GRPCRoute (loki-write-api-grpc): routes gRPC OTLP log ingestion to
+    loki.write.grpc.backendService:backendPort.
     Single rule: matches opentelemetry.proto.collector.logs.v1.LogsService + X-Scope-OrgID header
                  → forwards to backend.
     Requests missing X-Scope-OrgID do not match and are rejected by Envoy (no route match).
     Note: GRPCRoute does not support HTTPRouteFilter ExtensionRef, so a directResponse
     rule cannot be used; missing-header requests get a non-401 rejection instead.
 
-    The route targets the Loki write component directly (not loki-gateway) because the nginx
-    gateway does not handle gRPC traffic. In SimpleScalable mode this is loki-write; in
-    microservices mode this is loki-distributor.
+    The backend must serve LogsService over gRPC, for example an OpenTelemetry Collector
+    in front of Loki. Loki itself serves OTLP over HTTP only. Not rendered when
+    loki.write.grpc.backendService is empty (the default).
 
 Exposed gRPC service:
   opentelemetry.proto.collector.logs.v1.LogsService  (OTLP log ingestion)
 */}}
-{{- if and .Values.loki.enabled .Values.auth.jwt.providers -}}
+{{- if and .Values.loki.enabled .Values.auth.jwt.providers .Values.loki.write.grpc.backendService -}}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: GRPCRoute

@@ -59,7 +59,7 @@ The table below describes the JWT domain. When `basicAuth.enabled` is set, the M
 │             │ /loki/api/v1/patterns                                        │                                  │               │
 │ HTTPS       │ /loki/api/v1/push                                            │ Logs / Loki                      │ Write         │
 │ HTTPS       │ /otlp/v1/logs                                                │ Logs / Loki (OTLP HTTP)          │ Write         │
-│ gRPC (+TLS) │ opentelemetry.proto.collector.logs.v1.LogsService            │ Logs / Loki (OTLP gRPC)          │ Write         │
+│ gRPC (+TLS) │ opentelemetry.proto.collector.logs.v1.LogsService            │ Logs (OTLP gRPC) *               │ Write         │
 │ HTTPS       │ /prometheus/api/v1/query                                     │ Metrics / Mimir                  │ Read          │
 │             │ /prometheus/api/v1/query_range                               │                                  │               │
 │             │ /prometheus/api/v1/query_exemplars                           │                                  │               │
@@ -90,6 +90,8 @@ The table below describes the JWT domain. When `basicAuth.enabled` is set, the M
 │ gRPC (+TLS) │ opentelemetry.proto.collector.trace.v1.TraceService          │ Traces / Tempo (OTLP gRPC)       │ Write         │
 └─────────────┴──────────────────────────────────────────────────────────────┴──────────────────────────────────┴───────────────┘
 ```
+
+\* Disabled by default. Set `loki.write.grpc.backendService` to a backend that serves `LogsService` over gRPC, for example an OpenTelemetry Collector in front of Loki. Loki serves OTLP over HTTP only.
 
 ### Authentication
 

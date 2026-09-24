@@ -98,11 +98,11 @@ loki:
     paths:
     - /loki/api/v1/push
     - /otlp/v1/logs
-    # -- gRPC OTLP ingestion. Routes directly to the Loki write component (bypasses the nginx
-    # gateway, which does not handle gRPC). Set backendService/backendPort to enable.
-    # Use loki-write for SimpleScalable mode (default); loki-distributor for microservices mode.
+    # -- gRPC OTLP ingestion. Disabled by default. Set backendService/backendPort to enable.
+    # The backend must serve opentelemetry.proto.collector.logs.v1.LogsService over gRPC,
+    # for example an OpenTelemetry Collector in front of Loki. Loki itself does not.
     grpc:
-      backendService: loki-write
+      backendService: ""
       backendPort: 9095
     # -- Mirror accepted writes to a second backend, fire-and-forget. A cross-namespace
     # backendRef needs a ReferenceGrant in the target namespace; this chart does not

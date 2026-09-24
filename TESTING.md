@@ -35,6 +35,19 @@ helm template observability-platform-api \
 helm template observability-platform-api ./helm/observability-platform-api \
   --set loki.enabled=true | grep -c 'kind:'
 # expect: 0
+
+# Verify the Loki GRPCRoute and its SecurityPolicy targetRef render only when
+# loki.write.grpc.backendService is set (ci/test-values.yaml sets it)
+helm template observability-platform-api ./helm/observability-platform-api \
+  -f helm/observability-platform-api/ci/test-values.yaml \
+  | grep -c 'loki-write-api-grpc'
+# expect: 2
+
+helm template observability-platform-api ./helm/observability-platform-api \
+  -f helm/observability-platform-api/ci/test-values.yaml \
+  --set loki.write.grpc.backendService="" \
+  | grep -c 'loki-write-api-grpc'
+# expect: 0
 ```
 
 ### What happens when auth is not configured?
@@ -298,7 +311,9 @@ curl -si -X POST "$BASE/otlp/v1/logs" -H "$SCOPE"  # expect 401
 
 ### Loki write — gRPC OTLP
 
-Backend: `loki-distributor:9095`. Separate `GRPCRoute` — bypasses `loki-gateway` (nginx does not handle gRPC).
+Backend: `loki.write.grpc.backendService:backendPort`. Separate `GRPCRoute` — bypasses `loki-gateway` (nginx does not handle gRPC).
+
+> **Note on the backend**: the route renders only when `loki.write.grpc.backendService` is set (empty by default). The backend must serve `opentelemetry.proto.collector.logs.v1.LogsService` over gRPC, for example an OpenTelemetry Collector in front of Loki. Loki itself serves OTLP over HTTP only.
 
 > **Note on missing `X-Scope-OrgID`**: `GRPCRoute` does not support `HTTPRouteFilter` via `ExtensionRef`, so requests missing `X-Scope-OrgID` get a no-route rejection rather than a strict 401.
 
