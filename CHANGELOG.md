@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Change the missing `X-Scope-OrgID` response body from `Bad Request` to `Missing X-Scope-OrgID header` in the Loki, Mimir, Tempo and Basic Auth `headers-check` filters. The status stays `401`.
+
 ### Fixed
 
 - Render the Loki OTLP gRPC route (`GRPCRoute` `loki-write-api-grpc`) and its `SecurityPolicy` targetRef only when `loki.write.grpc.backendService` is set. `loki.write.grpc.backendService` now defaults to empty (disabled). The backend must serve `opentelemetry.proto.collector.logs.v1.LogsService` over gRPC, for example an OpenTelemetry Collector in front of Loki. Loki serves OTLP over HTTP only.
