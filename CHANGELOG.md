@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Remove the Loki OTLP gRPC route and `loki.write.grpc`. Loki serves OTLP over HTTP only.
 
+### Fixed
+
+- The `helm.sh/chart` label is valid for long chart versions: the 63-character cut trims the whole trailing run of `-`, `.` and `_`.
+
 ## [0.5.0] - 2026-08-31
 
 ### Added
