@@ -98,12 +98,6 @@ loki:
     paths:
     - /loki/api/v1/push
     - /otlp/v1/logs
-    # -- gRPC OTLP ingestion. Disabled by default. Set backendService/backendPort to enable.
-    # The backend must serve opentelemetry.proto.collector.logs.v1.LogsService over gRPC,
-    # for example an OpenTelemetry Collector in front of Loki. Loki itself does not.
-    grpc:
-      backendService: ""
-      backendPort: 9095
     # -- Mirror accepted writes to a second backend, fire-and-forget. A cross-namespace
     # backendRef needs a ReferenceGrant in the target namespace; this chart does not
     # create one. The loki chart's own requestMirror does, and because a grant's
