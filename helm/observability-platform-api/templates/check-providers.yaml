@@ -1,0 +1,9 @@
+{{/*
+Guard for the JWT providers. No resource is created from this template.
+
+Every Loki, Mimir and Tempo route needs `auth.jwt.providers`. An empty list fails the
+render when any of them is enabled.
+*/}}
+{{- if and (or .Values.loki.enabled .Values.mimir.enabled .Values.tempo.enabled) (not .Values.auth.jwt.providers) }}
+{{- fail "auth.jwt.providers is empty. loki.enabled, mimir.enabled or tempo.enabled is true. Their routes need at least one OIDC issuer." }}
+{{- end }}
