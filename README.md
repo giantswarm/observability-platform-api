@@ -59,7 +59,6 @@ The table below describes the JWT domain. When `basicAuth.enabled` is set, the M
 │             │ /loki/api/v1/patterns                                        │                                  │               │
 │ HTTPS       │ /loki/api/v1/push                                            │ Logs / Loki                      │ Write         │
 │ HTTPS       │ /otlp/v1/logs                                                │ Logs / Loki (OTLP HTTP)          │ Write         │
-│ gRPC (+TLS) │ opentelemetry.proto.collector.logs.v1.LogsService            │ Logs / Loki (OTLP gRPC)          │ Write         │
 │ HTTPS       │ /prometheus/api/v1/query                                     │ Metrics / Mimir                  │ Read          │
 │             │ /prometheus/api/v1/query_range                               │                                  │               │
 │             │ /prometheus/api/v1/query_exemplars                           │                                  │               │
@@ -134,7 +133,7 @@ This app creates multiple `HTTPRoute` and `GRPCRoute` resources (one per service
 **Template structure** — templates are organised per service under `templates/loki/`, `templates/mimir/`, and `templates/tempo/`. Each directory contains:
 - `route-read.yaml` — HTTP read `HTTPRoute`
 - `route-write.yaml` — HTTP write `HTTPRoute`
-- `route-grpc.yaml` — gRPC `GRPCRoute`(s): Loki OTLP write; Tempo read + OTLP write
+- `route-grpc.yaml` — gRPC `GRPCRoute`(s): Tempo read + OTLP write
 - `securitypolicy.yaml` — one `SecurityPolicy` per route for Loki and Mimir (single SP covers all HTTP routes); Tempo requires one SP per route because each `GRPCRoute` must have its own `SecurityPolicy`
 - `filters.yaml` — shared `HTTPRouteFilter` resources (headers-check and path rewrite where applicable)
 

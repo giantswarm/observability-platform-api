@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Change the missing `X-Scope-OrgID` response body from `Bad Request` to `Missing X-Scope-OrgID header` in the Loki, Mimir, Tempo and Basic Auth `headers-check` filters. The status stays `401`.
+
+### Removed
+
+- Remove the Loki OTLP gRPC route and `loki.write.grpc`. Loki serves OTLP over HTTP only.
+
 ### Fixed
 
 - The `helm.sh/chart` label is valid for long chart versions: the 63-character cut trims the whole trailing run of `-`, `.` and `_`.

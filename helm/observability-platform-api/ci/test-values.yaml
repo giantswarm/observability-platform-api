@@ -29,9 +29,6 @@ loki:
     - /loki/api/v1/push
     - /otlp/v1/logs
     stripPrefixPaths: []
-    grpc:
-      backendService: loki-write
-      backendPort: 9095
 
 mimir:
   enabled: true
