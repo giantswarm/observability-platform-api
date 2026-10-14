@@ -178,17 +178,6 @@
                         "backendService": {
                             "type": "string"
                         },
-                        "grpc": {
-                            "type": "object",
-                            "properties": {
-                                "backendPort": {
-                                    "type": "integer"
-                                },
-                                "backendService": {
-                                    "type": "string"
-                                }
-                            }
-                        },
                         "paths": {
                             "type": "array",
                             "items": {

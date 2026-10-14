@@ -28,7 +28,7 @@ spec:
     statusCode: 401
     body:
       type: Inline
-      inline: "Bad Request"
+      inline: "Missing X-Scope-OrgID header"
 {{- end }}
 {{- end }}
 {{- end }}

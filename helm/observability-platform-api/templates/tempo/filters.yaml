@@ -22,7 +22,7 @@ spec:
     statusCode: 401
     body:
       type: Inline
-      inline: "Bad Request"
+      inline: "Missing X-Scope-OrgID header"
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: HTTPRouteFilter
