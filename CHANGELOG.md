@@ -10,7 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Change the missing `X-Scope-OrgID` response body from `Bad Request` to `Missing X-Scope-OrgID header` in the Loki, Mimir, Tempo and Basic Auth `headers-check` filters. The status stays `401`.
-
 - Fail the render when `loki.enabled`, `mimir.enabled` or `tempo.enabled` is true and `auth.jwt.providers` is empty.
 
 ### Removed
