@@ -8,7 +8,7 @@
 # Usage: BASE_URL=https://observability.<codename>.<base-domain> TOKEN=<jwt> test-tempo.sh
 #
 # Environment:
-#   BASE_URL  API base URL (required)
+#   BASE_URL  API base URL (required). An http:// URL uses plaintext gRPC and OTLP.
 #   TOKEN     JWT from a configured OIDC provider (required, see hack/dex-token.sh)
 #   TENANT    X-Scope-OrgID value (default: giantswarm)
 #   TIMEOUT   Seconds to wait for ingested data (default: 60)
@@ -31,8 +31,18 @@ TIMEOUT="${TIMEOUT:-60}"
 
 PROTOSET="$(cd "$(dirname "$0")" && pwd)/tempo.protoset"
 BASE_URL="${BASE_URL%/}"
-HOST="${BASE_URL#https://}"
-GRPC_HOST="${HOST%%/*}:443"
+GRPC_HOST="${BASE_URL#*://}"
+GRPC_HOST="${GRPC_HOST%%/*}"
+if [[ "$BASE_URL" == http://* ]]; then
+  GRPC_PORT=80
+  GRPCURL_TLS=(-plaintext)
+  TELEMETRYGEN_TLS=(--otlp-insecure)
+else
+  GRPC_PORT=443
+  GRPCURL_TLS=()
+  TELEMETRYGEN_TLS=()
+fi
+[[ "$GRPC_HOST" == *:* ]] || GRPC_HOST="$GRPC_HOST:$GRPC_PORT"
 
 # Unique names per run, so each run only finds its own traces.
 RUN_ID="$(date +%s)-$$"
@@ -92,7 +102,7 @@ api() {
 
 # grpc METHOD JSON: authenticated call on tempopb.StreamingQuerier, stream slurped to one JSON array.
 grpc() {
-  grpcurl -protoset "$PROTOSET" \
+  grpcurl -protoset "$PROTOSET" "${GRPCURL_TLS[@]}" \
     -H "Authorization: Bearer $TOKEN" -H "X-Scope-OrgID: $TENANT" \
     -d "$2" "$GRPC_HOST" "tempopb.StreamingQuerier/$1" | jq -s .
 }
@@ -133,21 +143,27 @@ expect() {
 write_otlp() {
   # telemetrygen exits 0 on export failures and logs them as "traces export: <error>".
   local endpoint="$1" out; shift
-  out="$(telemetrygen traces --traces 1 --otlp-endpoint "$endpoint" \
+  out="$(telemetrygen traces --traces 1 --otlp-endpoint "$endpoint" "${TELEMETRYGEN_TLS[@]}" \
     --otlp-header "Authorization=\"Bearer $TOKEN\"" \
-    --otlp-header "X-Scope-OrgID=\"$TENANT\"" "$@" 2>&1)"
+    --otlp-header "X-Scope-OrgID=\"$TENANT\"" "$@" 2>&1)" || { echo "$out"; return 1; }
   ! echo "$out" | grep 'traces export:'
 }
 
 # search QUERY: fails when QUERY finds no trace, else saves the first trace ID in TRACE_ID.
 search() {
-  TRACE_ID="$(api /tempo/api/search --data-urlencode "q=$1" "${WINDOW[@]}" | jq -er '.traces[0].traceID')"
+  TRACE_ID="$(api /tempo/api/search --data-urlencode "q=$1" "${WINDOW[@]}" | jq -er '.traces[0].traceID // empty')"
+}
+
+# with_trace CMD...: fails when TRACE_ID is empty, else runs CMD.
+with_trace() {
+  [ -n "$TRACE_ID" ] || { echo "no trace ID"; return 1; }
+  "$@"
 }
 
 # grpc_no_token: expects the gRPC API to reject a call without a token.
 grpc_no_token() {
   local out
-  out="$(grpcurl -protoset "$PROTOSET" -H "X-Scope-OrgID: $TENANT" -d '{}' \
+  out="$(grpcurl -protoset "$PROTOSET" "${GRPCURL_TLS[@]}" -H "X-Scope-OrgID: $TENANT" -d '{}' \
     "$GRPC_HOST" tempopb.StreamingQuerier/SearchTagsV2 2>&1)" || true
   echo "$out" | grep Unauthenticated
 }
@@ -187,9 +203,9 @@ check "http/write no token" expect 401 "$(status -X POST "$BASE_URL/v1/traces" -
 check "grpc/read no token" grpc_no_token
 
 echo "== Tenant isolation"
-check "http/traces v1 other tenant" expect 404 "$(status "$BASE_URL/tempo/api/traces/$TRACE_ID" -H "Authorization: Bearer $TOKEN" -H "X-Scope-OrgID: $OTHER_TENANT")"
+check "http/traces v1 other tenant" with_trace expect 404 "$(status "$BASE_URL/tempo/api/traces/$TRACE_ID" -H "Authorization: Bearer $TOKEN" -H "X-Scope-OrgID: $OTHER_TENANT")"
 # The v2 endpoint answers 200 with an empty trace when the trace does not exist.
-check "http/traces v2 other tenant" other_tenant http_json "/tempo/api/v2/traces/$TRACE_ID" '(.trace.resourceSpans // []) | length == 0'
+check "http/traces v2 other tenant" with_trace other_tenant http_json "/tempo/api/v2/traces/$TRACE_ID" '(.trace.resourceSpans // []) | length == 0'
 check "http/search other tenant" other_tenant http_json /tempo/api/search '(.traces // []) | length == 0' --data-urlencode "q=$QUERY_HTTP" "${WINDOW[@]}"
 
 echo "== $passed/$total checks passed"

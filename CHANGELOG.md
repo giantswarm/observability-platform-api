@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add the `make test-tempo` end-to-end test for Tempo, with the `make dex-token` and `make update-tempo-protoset` helpers.
+
 ### Changed
 
 - Fail the render when `loki.enabled`, `mimir.enabled` or `tempo.enabled` is true and `auth.jwt.providers` is empty.

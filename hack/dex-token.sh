@@ -38,7 +38,8 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
   fi
   error="$(echo "$response" | jq -r '.error // empty' 2>/dev/null || true)"
   case "$error" in
-    authorization_pending|slow_down|"") ;;
+    authorization_pending|"") ;;
+    slow_down) interval=$((interval + 5)) ;;
     *) echo "Dex error: $response" >&2; exit 1 ;;
   esac
 done
