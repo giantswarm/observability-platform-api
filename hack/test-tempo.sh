@@ -13,8 +13,14 @@
 #   TENANT    X-Scope-OrgID value (default: giantswarm)
 #   TIMEOUT   Seconds to wait for ingested data (default: 60)
 #
-# Dependencies: curl, jq, grpcurl, telemetrygen.
+# Dependencies:
+#   curl, jq
+#   grpcurl       go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest
+#   telemetrygen  go install github.com/open-telemetry/opentelemetry-collector-contrib/cmd/telemetrygen@latest
 # The gRPC checks use hack/tempo.protoset (make update-tempo-protoset).
+
+# The jq filters reference $a, $b and $id in single quotes on purpose (see assert).
+# shellcheck disable=SC2016
 
 set -euo pipefail
 
@@ -28,6 +34,7 @@ BASE_URL="${BASE_URL%/}"
 HOST="${BASE_URL#https://}"
 GRPC_HOST="${HOST%%/*}:443"
 
+# Unique names per run, so each run only finds its own traces.
 RUN_ID="$(date +%s)-$$"
 SVC_HTTP="e2e-otlp-http-$RUN_ID"
 SVC_GRPC="e2e-otlp-grpc-$RUN_ID"
@@ -37,27 +44,22 @@ QUERY_GRPC="{resource.service.name=\"$SVC_GRPC\"}"
 QUERY_METRICS="$QUERY_HTTP | count_over_time()"
 TRACE_ID=""
 
+# Query time window in unix seconds. END covers the longest possible run (4 polls).
+START=$(( $(date +%s) - 600 ))
+END=$(( $(date +%s) + 4 * TIMEOUT + 60 ))
+WINDOW=(-d "start=$START" -d "end=$END")
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m'
 
 passed=0
 total=0
-missing=0
-for dep in curl:"" jq:"" \
-  grpcurl:"go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest" \
-  telemetrygen:"go install github.com/open-telemetry/opentelemetry-collector-contrib/cmd/telemetrygen@latest"; do
-  if ! command -v "${dep%%:*}" >/dev/null; then
-    echo "missing dependency: ${dep%%:*} ${dep#*:}" >&2
-    missing=1
-  fi
-done
-[ "$missing" -eq 0 ] || exit 1
-[ -f "$PROTOSET" ] || { echo "missing $PROTOSET, run: make update-tempo-protoset" >&2; exit 1; }
 
-# Time window in unix seconds.
-start() { echo $(( $(date +%s) - 600 )); }
-end() { echo $(( $(date +%s) + 60 )); }
+for dep in curl jq grpcurl telemetrygen; do
+  command -v "$dep" >/dev/null || { echo "missing dependency: $dep" >&2; exit 1; }
+done
+[ -f "$PROTOSET" ] || { echo "missing $PROTOSET, run: make update-tempo-protoset" >&2; exit 1; }
 
 # check NAME CMD...: runs CMD once and records the result.
 check() {
@@ -72,6 +74,7 @@ check() {
 }
 
 # poll NAME CMD...: retries CMD every 2s until it succeeds or TIMEOUT expires.
+# The retries run in the current shell, so variables CMD sets stay set.
 poll() {
   local name="$1" deadline=$(( $(date +%s) + TIMEOUT )); shift
   until "$@" >/dev/null 2>&1 || [ "$(date +%s)" -ge "$deadline" ]; do
@@ -94,6 +97,28 @@ grpc() {
     -d "$2" "$GRPC_HOST" "tempopb.StreamingQuerier/$1" | jq -s .
 }
 
+# assert FILTER: tests stdin JSON against the jq FILTER.
+# FILTER can use $a (SVC_HTTP), $b (SVC_GRPC) and $id (TRACE_ID).
+assert() {
+  jq -e --arg a "$SVC_HTTP" --arg b "$SVC_GRPC" --arg id "$TRACE_ID" "$1" >/dev/null
+}
+
+# http_json PATH FILTER [CURL_ARGS...]: GETs PATH and tests the JSON against FILTER.
+http_json() {
+  local path="$1" filter="$2"; shift 2
+  api "$path" "$@" | assert "$filter"
+}
+
+# grpc_json METHOD JSON FILTER: calls METHOD and tests the slurped JSON against FILTER.
+grpc_json() {
+  grpc "$1" "$2" | assert "$3"
+}
+
+# other_tenant CMD...: runs CMD with TENANT set to OTHER_TENANT.
+other_tenant() {
+  TENANT="$OTHER_TENANT" "$@"
+}
+
 # status [CURL_ARGS...]: prints the HTTP status code.
 status() {
   curl -s -o /dev/null -w '%{http_code}' "$@"
@@ -104,7 +129,7 @@ expect() {
   [ "$1" = "$2" ] || { echo "want $1, got $2"; return 1; }
 }
 
-# write_otlp ENDPOINT [TELEMETRYGEN_ARGS...]
+# write_otlp ENDPOINT [TELEMETRYGEN_ARGS...]: sends one trace.
 write_otlp() {
   # telemetrygen exits 0 on export failures and logs them as "traces export: <error>".
   local endpoint="$1" out; shift
@@ -114,14 +139,17 @@ write_otlp() {
   ! echo "$out" | grep 'traces export:'
 }
 
-search_finds() {
-  api /tempo/api/search --data-urlencode "q=$1" -d "start=$(start)" -d "end=$(end)" \
-    | jq -e '.traces | length > 0' >/dev/null
+# search QUERY: fails when QUERY finds no trace, else saves the first trace ID in TRACE_ID.
+search() {
+  TRACE_ID="$(api /tempo/api/search --data-urlencode "q=$1" "${WINDOW[@]}" | jq -er '.traces[0].traceID')"
 }
 
-save_trace_id() {
-  TRACE_ID="$(api /tempo/api/search --data-urlencode "q=$QUERY_HTTP" -d "start=$(start)" -d "end=$(end)" \
-    | jq -er '.traces[0].traceID')"
+# grpc_no_token: expects the gRPC API to reject a call without a token.
+grpc_no_token() {
+  local out
+  out="$(grpcurl -protoset "$PROTOSET" -H "X-Scope-OrgID: $TENANT" -d '{}' \
+    "$GRPC_HOST" tempopb.StreamingQuerier/SearchTagsV2 2>&1)" || true
+  echo "$out" | grep Unauthenticated
 }
 
 echo "Testing $BASE_URL as tenant $TENANT (run $RUN_ID)"
@@ -131,105 +159,38 @@ check "write/otlp-http" write_otlp "$GRPC_HOST" --otlp-http --service "$SVC_HTTP
 # passthrough skips the gRPC Go DNS resolver, which can hang where the system resolver works.
 check "write/otlp-grpc" write_otlp "passthrough:///$GRPC_HOST" --service "$SVC_GRPC"
 
-http_echo() {
-  expect echo "$(api /tempo/api/echo)"
-}
-http_buildinfo() {
-  api /tempo/api/status/buildinfo | jq -e '.version | length > 0' >/dev/null
-}
-http_traces_v1() {
-  api "/tempo/api/traces/$TRACE_ID" | jq -e '(.batches // .resourceSpans) | length > 0' >/dev/null
-}
-http_traces_v2() {
-  api "/tempo/api/v2/traces/$TRACE_ID" | jq -e '.trace.resourceSpans | length > 0' >/dev/null
-}
-http_tags_v1() {
-  api /tempo/api/search/tags -d "start=$(start)" -d "end=$(end)" \
-    | jq -e '.tagNames | index("service.name")' >/dev/null
-}
-http_tag_values_v1() {
-  api /tempo/api/search/tag/service.name/values -d "start=$(start)" -d "end=$(end)" \
-    | jq -e --arg a "$SVC_HTTP" --arg b "$SVC_GRPC" '.tagValues | index($a) and index($b)' >/dev/null
-}
-http_tags_v2() {
-  api /tempo/api/v2/search/tags -d "start=$(start)" -d "end=$(end)" \
-    | jq -e '[.scopes[].tags[]] | index("service.name")' >/dev/null
-}
-http_tag_values_v2() {
-  api /tempo/api/v2/search/tag/resource.service.name/values -d "start=$(start)" -d "end=$(end)" \
-    | jq -e --arg a "$SVC_HTTP" --arg b "$SVC_GRPC" '[.tagValues[].value] | index($a) and index($b)' >/dev/null
-}
-http_metrics() {
-  api /tempo/api/metrics/query_range --data-urlencode "q=$QUERY_METRICS" \
-    -d "start=$(start)" -d "end=$(end)" -d "step=60s" | jq -e '.series | length > 0' >/dev/null
-}
-
 echo "== Read HTTP"
-check "http/echo" http_echo
-check "http/buildinfo" http_buildinfo
-poll "http/search otlp-http" search_finds "$QUERY_HTTP"
-poll "http/search otlp-grpc" search_finds "$QUERY_GRPC"
-save_trace_id 2>/dev/null || true
-check "http/traces v1" http_traces_v1
-check "http/traces v2" http_traces_v2
-check "http/search/tags v1" http_tags_v1
-check "http/search/tag/values v1" http_tag_values_v1
-check "http/search/tags v2" http_tags_v2
-check "http/search/tag/values v2" http_tag_values_v2
-poll "http/metrics/query_range" http_metrics
+check "http/echo" expect echo "$(api /tempo/api/echo)"
+check "http/buildinfo" http_json /tempo/api/status/buildinfo '.version | length > 0'
+# The otlp-http search runs last: the checks below use the TRACE_ID it saves.
+poll "http/search otlp-grpc" search "$QUERY_GRPC"
+poll "http/search otlp-http" search "$QUERY_HTTP"
+check "http/traces v1" http_json "/tempo/api/traces/$TRACE_ID" '(.batches // .resourceSpans) | length > 0'
+check "http/traces v2" http_json "/tempo/api/v2/traces/$TRACE_ID" '.trace.resourceSpans | length > 0'
+check "http/search/tags v1" http_json /tempo/api/search/tags '.tagNames | index("service.name")' "${WINDOW[@]}"
+check "http/search/tag/values v1" http_json /tempo/api/search/tag/service.name/values '.tagValues | index($a) and index($b)' "${WINDOW[@]}"
+check "http/search/tags v2" http_json /tempo/api/v2/search/tags '[.scopes[].tags[]] | index("service.name")' "${WINDOW[@]}"
+check "http/search/tag/values v2" http_json /tempo/api/v2/search/tag/resource.service.name/values '[.tagValues[].value] | index($a) and index($b)' "${WINDOW[@]}"
+poll "http/metrics/query_range" http_json /tempo/api/metrics/query_range '.series | length > 0' --data-urlencode "q=$QUERY_METRICS" "${WINDOW[@]}" -d "step=60s"
 
 echo "== Read gRPC"
-grpc_search() {
-  grpc Search "{\"Query\": $(jq -n --arg q "$QUERY_HTTP" '$q'), \"start\": $(start), \"end\": $(end)}" \
-    | jq -e --arg id "$TRACE_ID" '[.[].traces[]?.traceID] | index($id)' >/dev/null
-}
-grpc_tags() {
-  grpc SearchTagsV2 "{\"start\": $(start), \"end\": $(end)}" \
-    | jq -e '[.[].scopes[]?.tags[]?] | index("service.name")' >/dev/null
-}
-grpc_tag_values() {
-  grpc SearchTagValuesV2 "{\"tagName\": \"resource.service.name\", \"start\": $(start), \"end\": $(end)}" \
-    | jq -e --arg a "$SVC_HTTP" --arg b "$SVC_GRPC" '[.[].tagValues[]?.value] | index($a) and index($b)' >/dev/null
-}
-grpc_metrics() {
-  grpc MetricsQueryRange "{\"query\": $(jq -n --arg q "$QUERY_METRICS" '$q'), \"start\": $(start)000000000, \"end\": $(end)000000000, \"step\": 60000000000}" \
-    | jq -e '[.[].series[]?] | length > 0' >/dev/null
-}
-check "grpc/Search" grpc_search
-check "grpc/SearchTagsV2" grpc_tags
-check "grpc/SearchTagValuesV2" grpc_tag_values
-poll "grpc/MetricsQueryRange" grpc_metrics
+check "grpc/Search" grpc_json Search "{\"Query\": $(jq -n --arg q "$QUERY_HTTP" '$q'), \"start\": $START, \"end\": $END}" '[.[].traces[]?.traceID] | index($id)'
+check "grpc/SearchTagsV2" grpc_json SearchTagsV2 "{\"start\": $START, \"end\": $END}" '[.[].scopes[]?.tags[]?] | index("service.name")'
+check "grpc/SearchTagValuesV2" grpc_json SearchTagValuesV2 "{\"tagName\": \"resource.service.name\", \"start\": $START, \"end\": $END}" '[.[].tagValues[]?.value] | index($a) and index($b)'
+# MetricsQueryRange takes nanoseconds.
+poll "grpc/MetricsQueryRange" grpc_json MetricsQueryRange "{\"query\": $(jq -n --arg q "$QUERY_METRICS" '$q'), \"start\": ${START}000000000, \"end\": ${END}000000000, \"step\": 60000000000}" '[.[].series[]?] | length > 0'
 
 echo "== Auth rejections"
 check "http/read no token" expect 401 "$(status "$BASE_URL/tempo/api/echo" -H "X-Scope-OrgID: $TENANT")"
 check "http/read no tenant" expect 401 "$(status "$BASE_URL/tempo/api/echo" -H "Authorization: Bearer $TOKEN")"
-check "http/write no token" expect 401 "$(status -X POST "$BASE_URL/v1/traces" -H "X-Scope-OrgID: $TENANT" \
-  -H "Content-Type: application/json" -d '{"resourceSpans":[]}')"
-grpc_no_token() {
-  local out
-  out="$(grpcurl -protoset "$PROTOSET" -H "X-Scope-OrgID: $TENANT" -d '{}' \
-    "$GRPC_HOST" tempopb.StreamingQuerier/SearchTagsV2 2>&1)" || true
-  echo "$out" | grep Unauthenticated
-}
+check "http/write no token" expect 401 "$(status -X POST "$BASE_URL/v1/traces" -H "X-Scope-OrgID: $TENANT" -H "Content-Type: application/json" -d '{"resourceSpans":[]}')"
 check "grpc/read no token" grpc_no_token
 
 echo "== Tenant isolation"
-check "http/traces v1 other tenant" expect 404 "$(status "$BASE_URL/tempo/api/traces/$TRACE_ID" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Scope-OrgID: $OTHER_TENANT")"
+check "http/traces v1 other tenant" expect 404 "$(status "$BASE_URL/tempo/api/traces/$TRACE_ID" -H "Authorization: Bearer $TOKEN" -H "X-Scope-OrgID: $OTHER_TENANT")"
 # The v2 endpoint answers 200 with an empty trace when the trace does not exist.
-traces_v2_other_tenant() {
-  curl -sSf "$BASE_URL/tempo/api/v2/traces/$TRACE_ID" \
-    -H "Authorization: Bearer $TOKEN" -H "X-Scope-OrgID: $OTHER_TENANT" \
-    | jq -e '(.trace.resourceSpans // []) | length == 0' >/dev/null
-}
-check "http/traces v2 other tenant" traces_v2_other_tenant
-search_other_tenant() {
-  curl -sSf -G "$BASE_URL/tempo/api/search" \
-    -H "Authorization: Bearer $TOKEN" -H "X-Scope-OrgID: $OTHER_TENANT" \
-    --data-urlencode "q=$QUERY_HTTP" -d "start=$(start)" -d "end=$(end)" \
-    | jq -e '(.traces // []) | length == 0' >/dev/null
-}
-check "http/search other tenant" search_other_tenant
+check "http/traces v2 other tenant" other_tenant http_json "/tempo/api/v2/traces/$TRACE_ID" '(.trace.resourceSpans // []) | length == 0'
+check "http/search other tenant" other_tenant http_json /tempo/api/search '(.traces // []) | length == 0' --data-urlencode "q=$QUERY_HTTP" "${WINDOW[@]}"
 
 echo "== $passed/$total checks passed"
 [ "$passed" -eq "$total" ]
