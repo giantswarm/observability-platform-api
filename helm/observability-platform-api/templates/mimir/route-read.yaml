@@ -3,17 +3,21 @@ Mimir read API routes (mimir.enabled=true)
 
 Resources:
   - HTTPRoute: routes read requests to mimir-gateway:80 in mimir.namespace.
-    Rule 1: matches path + X-Scope-OrgID header (regex ^.+$) → forwards to backend.
-    Rule 2: matches path only (no header) → returns 401 via HTTPRouteFilter.
+    Rule 1: matches path + method + X-Scope-OrgID header (regex ^.+$) → forwards to backend.
+    Rule 2: matches path + method only (no header) → returns 401 via HTTPRouteFilter.
+    Any other method gets Envoy's 404.
 
-Exposed paths (configured via mimir.readPaths):
-  /prometheus/api/v1/labels, /prometheus/api/v1/label, /prometheus/api/v1/rules,
-  /prometheus/api/v1/query, /prometheus/api/v1/query_range,
-  /prometheus/api/v1/query_exemplars, /prometheus/api/v1/status,
-  /prometheus/api/v1/metadata, /prometheus/api/v1/detected_labels
+Exposed paths and methods (configured via mimir.read.paths):
+  GET and POST: /prometheus/api/v1/labels, /prometheus/api/v1/label,
+    /prometheus/api/v1/query, /prometheus/api/v1/query_range,
+    /prometheus/api/v1/query_exemplars, /prometheus/api/v1/series,
+    /prometheus/api/v1/status, /prometheus/api/v1/metadata,
+    /prometheus/api/v1/detected_labels
+  GET only: /prometheus/api/v1/rules
 */}}
 {{- if and .Values.mimir.enabled .Values.auth.jwt.providers -}}
 ---
+{{- $matches := (include "read.matches" (dict "paths" .Values.mimir.read.paths "name" "mimir.read.paths") | fromYaml).matches }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -36,10 +40,11 @@ spec:
       namespace: {{ .Values.mimir.namespace }}
       port: {{ .Values.mimir.read.backendPort }}
     matches:
-    {{- range .Values.mimir.read.paths }}
+    {{- range $matches }}
     - path:
         type: PathPrefix
-        value: {{ . }}
+        value: {{ .path }}
+      method: {{ .method }}
       headers:
       - name: X-Scope-OrgID
         value: "^.+$"
@@ -62,9 +67,10 @@ spec:
         kind: HTTPRouteFilter
         name: {{ include "resource.default.name" . }}-mimir-headers-check
     matches:
-    {{- range .Values.mimir.read.paths }}
+    {{- range $matches }}
     - path:
         type: PathPrefix
-        value: {{ . }}
+        value: {{ .path }}
+      method: {{ .method }}
     {{- end }}
 {{- end }}

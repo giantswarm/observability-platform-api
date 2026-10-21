@@ -49,3 +49,35 @@ If ingress.tls.secretName is specified, use that instead for custom secret shari
 {{- printf "%s-%s-%s-tls" (include "resource.default.name" $context) $ingress.namespace $hostHash -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Matches for a read HTTPRoute, one per path and allowed method, because a
+Gateway API match takes a single method.
+
+Takes a dict with "paths" (<service>.read.paths) and "name" (the values key,
+for error messages). A string entry allows GET only. A {path, methods} entry
+allows the listed methods.
+
+Each read route renders every match twice, once with and once without the
+X-Scope-OrgID header, and Gateway API allows 128 matches across the rules of
+one route. So the render fails above 64 matches.
+
+Returns YAML: `matches: [{path, method}, ...]`. Use with fromYaml.
+*/}}
+{{- define "read.matches" -}}
+{{- $matches := list -}}
+{{- range .paths -}}
+{{- if kindIs "string" . -}}
+{{- $matches = append $matches (dict "path" . "method" "GET") -}}
+{{- else -}}
+{{- $path := .path -}}
+{{- range (.methods | uniq) -}}
+{{- $matches = append $matches (dict "path" $path "method" .) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- if gt (len $matches) 64 -}}
+{{- fail (printf "%s has %d path and method pairs. The maximum is 64: the read route renders each pair twice and Gateway API allows 128 matches per route." .name (len $matches)) -}}
+{{- end -}}
+{{- dict "matches" $matches | toYaml -}}
+{{- end -}}
