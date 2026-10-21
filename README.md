@@ -9,9 +9,9 @@ The **observability-platform-api** provides the external access layer for Giant 
 ### What this app is for:
 
 - **External API Access**: Secure HTTP/HTTPS endpoints for external systems to interact with observability services
-- **Authentication Gateway**: OIDC JWT authentication and tenant routing for all external requests
+- **Authentication Gateway**: OIDC JWT authentication for all external requests, with the tenant taken from the `X-Scope-OrgID` header
 - **Multi-Service Routing**: Unified domain with path-based routing to different observability backends
-- **Access Control**: Enforcement of tenant isolation via Envoy Gateway `SecurityPolicy` for all external access
+- **Access Control**: Envoy Gateway `SecurityPolicy` (JWT) on every route, and read routes limited to read methods. Tenants are not isolated, see [Tenancy](#tenancy)
 
 ## Place in Observability Platform
 
@@ -36,6 +36,13 @@ The observability-platform-api creates `HTTPRoute` and `GRPCRoute` resources und
 
 The table below describes the JWT domain. When `basicAuth.enabled` is set, the Mimir and Loki read rows are additionally served on `basicAuth.hostname` behind Basic Auth.
 
+Read routes match the HTTP method as well as the path. Other methods get a `404` from Envoy. Each entry of `loki.read.paths` and `mimir.read.paths` is either a path string, which allows `GET` only, or `{path, methods}`:
+
+- Loki: `GET` and `POST` on the query, label, series, index, `format_query`, `detected_*` and `patterns` endpoints. `GET` only on `/loki/api/v1/rules`, `/loki/api/v1/tail`, `/loki/api/v1/status/buildinfo` and `/loki/api/v1/drilldown-limits`. Creating or deleting Loki rules is not possible through the API.
+- Mimir: `GET` and `POST` on every read path, except `/prometheus/api/v1/rules`, which is `GET` only.
+
+A list can hold at most 64 path and method pairs. Each pair is rendered twice (with and without `X-Scope-OrgID`) and Gateway API allows 128 matches per route.
+
 ```
 ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                              Domain: https://observability.<codename>.<base-domain>                                           │
@@ -57,6 +64,9 @@ The table below describes the JWT domain. When `basicAuth.enabled` is set, the M
 │             │ /loki/api/v1/index/volume_range                              │                                  │               │
 │             │ /loki/api/v1/detected_fields                                 │                                  │               │
 │             │ /loki/api/v1/patterns                                        │                                  │               │
+│             │ /loki/api/v1/detected_field                                  │                                  │               │
+│             │ /loki/api/v1/status/buildinfo                                │                                  │               │
+│             │ /loki/api/v1/drilldown-limits                                │                                  │               │
 │ HTTPS       │ /loki/api/v1/push                                            │ Logs / Loki                      │ Write         │
 │ HTTPS       │ /otlp/v1/logs                                                │ Logs / Loki (OTLP HTTP)          │ Write         │
 │ HTTPS       │ /prometheus/api/v1/query                                     │ Metrics / Mimir                  │ Read          │
@@ -94,7 +104,10 @@ The table below describes the JWT domain. When `basicAuth.enabled` is set, the M
 
 All routes (read and write) require JWT Bearer token authentication via Envoy Gateway `SecurityPolicy`.
 
-All routes additionally enforce that the `X-Scope-OrgID` header is present and non-empty — requests missing it receive a `401`.
+All routes additionally enforce that the `X-Scope-OrgID` header is present and non-empty:
+
+- HTTP routes: a request with a valid credential but no `X-Scope-OrgID` gets `401` with the `text/plain` body `Missing X-Scope-OrgID header`. A missing or invalid JWT also gets `401`, with the body `Jwt is missing` (or the validation error) and a `www-authenticate` header, so the body tells the two cases apart.
+- gRPC routes (Tempo): a `GRPCRoute` cannot return a custom response, so a request without `X-Scope-OrgID` matches no route. The client gets `grpc-status: 12` (`UNIMPLEMENTED`) with no message, and Envoy logs `route_not_found`.
 
 Optionally, the Mimir and Loki *read* paths can additionally be exposed on a second hostname behind HTTP Basic Auth, for clients that cannot obtain an OIDC token — see [Basic Auth read routes](docs/basic-auth.md). This is disabled by default.
 
@@ -117,6 +130,20 @@ auth:
 ```
 
 Multiple OIDC providers are supported — tokens from any configured issuer are accepted. This handles both human users (OIDC sessions via Dex, Azure AD, etc.) and applications (Azure AD service principals, any OIDC-compliant IdP). Helm template strings are supported in all fields.
+
+### Tenancy
+
+The API authenticates requests. It does not isolate tenants:
+
+- The JWT is validated, but it is not tied to a tenant. The tenant is whatever the client sends in `X-Scope-OrgID`, and it reaches the backend unchanged.
+- So any valid token can read and write any tenant of Loki, Mimir and Tempo. The same is true of the Basic Auth routes.
+- A piped header such as `X-Scope-OrgID: a|b` reaches Loki. When the Loki read target runs with `-querier.multi-tenant-queries-enabled`, one query returns data from several tenants.
+
+Only give tokens to clients that may access every tenant on the installation.
+
+### Known limitations
+
+- Loki's Prometheus-compatible rules API (`/prometheus/api/v1/rules` and `/prometheus/api/v1/alerts` on Loki) is not reachable through the API when Loki and Mimir share a hostname: `/prometheus/api/v1/rules` goes to Mimir. Grafana alerting on Loki-managed rules is not supported through the API. Use `/loki/api/v1/rules` to list Loki rules.
 
 ## Architecture Notes
 
@@ -142,7 +169,7 @@ This app creates multiple `HTTPRoute` and `GRPCRoute` resources (one per service
 - All routes share the same hostname and `X-Scope-OrgID` enforcement
 - JWT providers (`auth.jwt.providers`) are shared across all services
 - JWT validation is done inline by Envoy Gateway — no external auth service required
-- gRPC routes (`GRPCRoute`) do not support `HTTPRouteFilter` via `ExtensionRef`, so missing `X-Scope-OrgID` on gRPC requests results in a no-route rejection rather than a strict 401
+- gRPC routes (`GRPCRoute`) do not support `HTTPRouteFilter` via `ExtensionRef`, so missing `X-Scope-OrgID` on gRPC requests results in a no-route rejection (`UNIMPLEMENTED`) rather than a strict 401
 
 ## Configuration & Deployment
 
