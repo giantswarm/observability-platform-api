@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add `loki.read.timeouts`, `mimir.read.timeouts` and `tempo.read.timeouts` so long read queries are no longer cut off after 15s (defaults: Loki `5m30s`, Mimir `2m30s`, Tempo `1m`).
+
 ## [0.6.0] - 2026-10-15
 
 ### Changed

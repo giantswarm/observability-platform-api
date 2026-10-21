@@ -34,6 +34,9 @@ spec:
     - name: {{ .Values.loki.read.backendService }}
       namespace: {{ .Values.loki.namespace }}
       port: {{ .Values.loki.read.backendPort }}
+    {{- with include "route.timeouts" .Values.loki.read.timeouts }}
+    {{- . | nindent 4 }}
+    {{- end }}
     matches:
     {{- range .Values.loki.read.paths }}
     - path:
@@ -54,6 +57,9 @@ spec:
     - name: {{ .Values.loki.read.backendService }}
       namespace: {{ .Values.loki.namespace }}
       port: {{ .Values.loki.read.backendPort }}
+    {{- with include "route.timeouts" .Values.loki.read.timeouts }}
+    {{- . | nindent 4 }}
+    {{- end }}
     filters:
     - type: ExtensionRef
       extensionRef:

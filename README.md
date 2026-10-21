@@ -118,6 +118,18 @@ auth:
 
 Multiple OIDC providers are supported — tokens from any configured issuer are accepted. This handles both human users (OIDC sessions via Dex, Azure AD, etc.) and applications (Azure AD service principals, any OIDC-compliant IdP). Helm template strings are supported in all fields.
 
+### Timeouts
+
+The HTTP read routes (JWT and Basic Auth) set a Gateway API request timeout. Without it, Envoy Gateway returns `504 upstream request timeout` after 15s. Each default is the backend's own query timeout plus 30s, so a slow query fails with the backend's error rather than the gateway's.
+
+| Service | Value | Default | Backend timeout it covers |
+|---------|-------|---------|---------------------------|
+| Loki | `loki.read.timeouts.request` | `5m30s` | `limits_config.query_timeout` (5m) |
+| Mimir | `mimir.read.timeouts.request` | `2m30s` | `querier.timeout` (2m) |
+| Tempo | `tempo.read.timeouts.request` | `1m` | search `query_timeout` and `server.http_server_write_timeout` (30s) |
+
+`<service>.read.timeouts.backendRequest` is optional and must not be longer than `request`. If you raise a backend's query timeout, raise the matching value too. Clients should use a timeout at least as long. For example, set the Grafana data source timeout (`jsonData.timeout`, in seconds) to `330` for Loki, `150` for Mimir and `60` for Tempo. Write routes and the Tempo gRPC route keep the Envoy Gateway default.
+
 ## Architecture Notes
 
 ### Multi-Route Design
