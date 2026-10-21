@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Expose the Loki `status/buildinfo`, `drilldown-limits` and `detected_field` read endpoints, so Grafana detects the Loki version and Logs Drilldown loads field values through the API.
+
+### Changed
+
+- The Loki and Mimir read routes only accept read methods, so rules can no longer be created or deleted through `/loki/api/v1/rules`. A path string in `loki.read.paths` or `mimir.read.paths` now allows `GET` only; use `{path, methods}` to allow `POST`.
+
 ## [0.6.0] - 2026-10-15
 
 ### Changed

@@ -27,10 +27,14 @@ reusing that service's existing `read.paths` / `read.backendService` /
 `read.backendPort`, plus a `SecurityPolicy` carrying only `basicAuth`, plus a
 headers-check `HTTPRouteFilter`. A single `ReferenceGrant` in
 `usersSecret.namespace` lets both SecurityPolicies read the one Secret.
+The routes also reuse the methods allowed in `read.paths`, so they match the
+JWT read routes method for method: for example `/loki/api/v1/rules` is `GET`
+only.
 
 `X-Scope-OrgID` is enforced exactly as on the JWT routes: present and non-empty,
-or `401`. Basic Auth authenticates the caller; it does not scope them to a
-tenant — the same is true of the JWT routes today.
+or `401` with the body `Missing X-Scope-OrgID header`. Basic Auth authenticates
+the caller; it does not scope them to a tenant — the same is true of the JWT
+routes, see [Tenancy](../README.md#tenancy).
 
 > **Prerequisite:** the `giantswarm-default` Gateway's wildcard listener and
 > certificate span a single label, so `basicAuth.hostname` must be of the form

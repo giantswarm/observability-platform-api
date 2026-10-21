@@ -73,23 +73,44 @@ loki:
   read:
     backendService: loki-gateway
     backendPort: 80
-    # -- Paths exposed on the Loki read route. Each matched with PathPrefix and forwarded as-is to loki-gateway:80.
+    # -- Paths and methods exposed on the Loki read route. Each path is matched with PathPrefix and forwarded
+    # as-is to loki-gateway:80. An entry is either a path string, which allows GET only, or `{path, methods}`,
+    # where methods is a list of GET, HEAD and POST. Other methods get a 404 from Envoy.
+    # Only allow POST where Loki treats POST as a read: POST on /loki/api/v1/rules creates ruler rules.
+    # At least one entry (a rule without matches would match every path), and at most 64 path and method pairs.
     paths:
-    - /loki/api/v1/labels
-    - /loki/api/v1/label
+    - path: /loki/api/v1/labels
+      methods: [GET, POST]
+    - path: /loki/api/v1/label
+      methods: [GET, POST]
     - /loki/api/v1/rules
-    - /loki/api/v1/query
-    - /loki/api/v1/index
-    - /loki/api/v1/query_range
-    - /loki/api/v1/series
-    - /loki/api/v1/detected_labels
+    - path: /loki/api/v1/query
+      methods: [GET, POST]
+    - path: /loki/api/v1/index
+      methods: [GET, POST]
+    - path: /loki/api/v1/query_range
+      methods: [GET, POST]
+    - path: /loki/api/v1/series
+      methods: [GET, POST]
+    - path: /loki/api/v1/detected_labels
+      methods: [GET, POST]
     - /loki/api/v1/tail
-    - /loki/api/v1/format_query
-    - /loki/api/v1/index/stats
-    - /loki/api/v1/index/volume
-    - /loki/api/v1/index/volume_range
-    - /loki/api/v1/detected_fields
-    - /loki/api/v1/patterns
+    - path: /loki/api/v1/format_query
+      methods: [GET, POST]
+    - path: /loki/api/v1/index/stats
+      methods: [GET, POST]
+    - path: /loki/api/v1/index/volume
+      methods: [GET, POST]
+    - path: /loki/api/v1/index/volume_range
+      methods: [GET, POST]
+    - path: /loki/api/v1/detected_fields
+      methods: [GET, POST]
+    - path: /loki/api/v1/detected_field
+      methods: [GET, POST]
+    - path: /loki/api/v1/patterns
+      methods: [GET, POST]
+    - /loki/api/v1/status/buildinfo
+    - /loki/api/v1/drilldown-limits
   # -- HTTP write route configuration.
   write:
     backendService: loki-gateway
@@ -122,18 +143,28 @@ mimir:
   read:
     backendService: mimir-gateway
     backendPort: 80
-    # -- Paths exposed on the Mimir read route. Each matched with PathPrefix and forwarded as-is to mimir-gateway:80.
+    # -- Paths and methods exposed on the Mimir read route. Each path is matched with PathPrefix and forwarded
+    # as-is to mimir-gateway:80. Same entry format as `loki.read.paths`: a path string allows GET only.
     paths:
-    - /prometheus/api/v1/labels
-    - /prometheus/api/v1/label
+    - path: /prometheus/api/v1/labels
+      methods: [GET, POST]
+    - path: /prometheus/api/v1/label
+      methods: [GET, POST]
     - /prometheus/api/v1/rules
-    - /prometheus/api/v1/query
-    - /prometheus/api/v1/query_exemplars
-    - /prometheus/api/v1/query_range
-    - /prometheus/api/v1/series
-    - /prometheus/api/v1/status
-    - /prometheus/api/v1/metadata
-    - /prometheus/api/v1/detected_labels
+    - path: /prometheus/api/v1/query
+      methods: [GET, POST]
+    - path: /prometheus/api/v1/query_exemplars
+      methods: [GET, POST]
+    - path: /prometheus/api/v1/query_range
+      methods: [GET, POST]
+    - path: /prometheus/api/v1/series
+      methods: [GET, POST]
+    - path: /prometheus/api/v1/status
+      methods: [GET, POST]
+    - path: /prometheus/api/v1/metadata
+      methods: [GET, POST]
+    - path: /prometheus/api/v1/detected_labels
+      methods: [GET, POST]
   # -- HTTP write route configuration.
   write:
     backendService: mimir-gateway

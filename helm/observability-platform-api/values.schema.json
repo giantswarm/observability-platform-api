@@ -163,8 +163,34 @@
                         },
                         "paths": {
                             "type": "array",
+                            "minItems": 1,
                             "items": {
-                                "type": "string"
+                                "description": "A path string (GET only), or a path with its allowed methods.",
+                                "oneOf": [
+                                    {
+                                        "type": "string",
+                                        "pattern": "^/"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "required": ["path", "methods"],
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "path": {
+                                                "type": "string",
+                                                "pattern": "^/"
+                                            },
+                                            "methods": {
+                                                "type": "array",
+                                                "minItems": 1,
+                                                "items": {
+                                                    "type": "string",
+                                                    "enum": ["GET", "HEAD", "POST"]
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
                             }
                         }
                     }
@@ -247,8 +273,34 @@
                         },
                         "paths": {
                             "type": "array",
+                            "minItems": 1,
                             "items": {
-                                "type": "string"
+                                "description": "A path string (GET only), or a path with its allowed methods.",
+                                "oneOf": [
+                                    {
+                                        "type": "string",
+                                        "pattern": "^/"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "required": ["path", "methods"],
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "path": {
+                                                "type": "string",
+                                                "pattern": "^/"
+                                            },
+                                            "methods": {
+                                                "type": "array",
+                                                "minItems": 1,
+                                                "items": {
+                                                    "type": "string",
+                                                    "enum": ["GET", "HEAD", "POST"]
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
                             }
                         }
                     }
