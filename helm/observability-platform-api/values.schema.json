@@ -155,6 +155,18 @@
                 "read": {
                     "type": "object",
                     "properties": {
+                        "backendPort": {
+                            "type": "integer"
+                        },
+                        "backendService": {
+                            "type": "string"
+                        },
+                        "paths": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
                         "timeouts": {
                             "type": "object",
                             "properties": {
@@ -166,18 +178,6 @@
                                     "type": "string",
                                     "pattern": "^(([0-9]{1,5}(h|m|s|ms)){1,4})?$"
                                 }
-                            }
-                        },
-                        "backendPort": {
-                            "type": "integer"
-                        },
-                        "backendService": {
-                            "type": "string"
-                        },
-                        "paths": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
                             }
                         }
                     }
@@ -252,6 +252,18 @@
                 "read": {
                     "type": "object",
                     "properties": {
+                        "backendPort": {
+                            "type": "integer"
+                        },
+                        "backendService": {
+                            "type": "string"
+                        },
+                        "paths": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
                         "timeouts": {
                             "type": "object",
                             "properties": {
@@ -263,18 +275,6 @@
                                     "type": "string",
                                     "pattern": "^(([0-9]{1,5}(h|m|s|ms)){1,4})?$"
                                 }
-                            }
-                        },
-                        "backendPort": {
-                            "type": "integer"
-                        },
-                        "backendService": {
-                            "type": "string"
-                        },
-                        "paths": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
                             }
                         }
                     }
@@ -339,19 +339,6 @@
                 "read": {
                     "type": "object",
                     "properties": {
-                        "timeouts": {
-                            "type": "object",
-                            "properties": {
-                                "backendRequest": {
-                                    "type": "string",
-                                    "pattern": "^(([0-9]{1,5}(h|m|s|ms)){1,4})?$"
-                                },
-                                "request": {
-                                    "type": "string",
-                                    "pattern": "^(([0-9]{1,5}(h|m|s|ms)){1,4})?$"
-                                }
-                            }
-                        },
                         "grpc": {
                             "type": "object",
                             "properties": {
@@ -367,6 +354,19 @@
                             "type": "array",
                             "items": {
                                 "type": "string"
+                            }
+                        },
+                        "timeouts": {
+                            "type": "object",
+                            "properties": {
+                                "backendRequest": {
+                                    "type": "string",
+                                    "pattern": "^(([0-9]{1,5}(h|m|s|ms)){1,4})?$"
+                                },
+                                "request": {
+                                    "type": "string",
+                                    "pattern": "^(([0-9]{1,5}(h|m|s|ms)){1,4})?$"
+                                }
                             }
                         }
                     }

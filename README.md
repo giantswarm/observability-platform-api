@@ -124,7 +124,7 @@ The HTTP read routes (JWT and Basic Auth) set a Gateway API request timeout. Wit
 
 | Service | Value | Default | Backend timeout it covers |
 |---------|-------|---------|---------------------------|
-| Loki | `loki.read.timeouts.request` | `5m30s` | `querier.query_timeout` (5m) |
+| Loki | `loki.read.timeouts.request` | `5m30s` | `limits_config.query_timeout` (5m) |
 | Mimir | `mimir.read.timeouts.request` | `2m30s` | `querier.timeout` (2m) |
 | Tempo | `tempo.read.timeouts.request` | `1m` | search `query_timeout` and `server.http_server_write_timeout` (30s) |
 

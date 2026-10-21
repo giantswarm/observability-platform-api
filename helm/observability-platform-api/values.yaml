@@ -74,7 +74,7 @@ loki:
     backendService: loki-gateway
     backendPort: 80
     # -- Gateway API timeouts on the Loki read route (JWT and Basic Auth) rules. Without them Envoy Gateway
-    # cuts requests after 15s. The `request` default is Loki's `querier.query_timeout` (5m)
+    # cuts requests after 15s. The `request` default is Loki's `limits_config.query_timeout` (5m in the loki chart)
     # plus 30s, so the backend's own timeout error reaches the client first.
     # `backendRequest` is optional and must not be longer than `request`.
     # Leave both empty to keep the Envoy Gateway default.
@@ -174,8 +174,8 @@ tempo:
   read:
     # -- Gateway API timeouts on the Tempo HTTP read route rules. Without them Envoy Gateway
     # cuts requests after 15s. The `request` default is Tempo's search `query_timeout` and
-    # `server.http_server_write_timeout` (30s)
-    # plus 30s, so the backend's own timeout error reaches the client first.
+    # `server.http_server_write_timeout` (30s) plus 30s, so the backend's own timeout error
+    # reaches the client first.
     # `backendRequest` is optional and must not be longer than `request`.
     # Leave both empty to keep the Envoy Gateway default.
     timeouts:
