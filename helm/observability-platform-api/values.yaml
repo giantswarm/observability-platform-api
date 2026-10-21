@@ -73,6 +73,14 @@ loki:
   read:
     backendService: loki-gateway
     backendPort: 80
+    # -- Gateway API timeouts on the Loki read route (JWT and Basic Auth) rules. Without them Envoy Gateway
+    # cuts requests after 15s. The `request` default is Loki's `querier.query_timeout` (5m)
+    # plus 30s, so the backend's own timeout error reaches the client first.
+    # `backendRequest` is optional and must not be longer than `request`.
+    # Leave both empty to keep the Envoy Gateway default.
+    timeouts:
+      request: 5m30s
+      backendRequest: ""
     # -- Paths exposed on the Loki read route. Each matched with PathPrefix and forwarded as-is to loki-gateway:80.
     paths:
     - /loki/api/v1/labels
@@ -122,6 +130,14 @@ mimir:
   read:
     backendService: mimir-gateway
     backendPort: 80
+    # -- Gateway API timeouts on the Mimir read route (JWT and Basic Auth) rules. Without them Envoy Gateway
+    # cuts requests after 15s. The `request` default is Mimir's `querier.timeout` (2m)
+    # plus 30s, so the backend's own timeout error reaches the client first.
+    # `backendRequest` is optional and must not be longer than `request`.
+    # Leave both empty to keep the Envoy Gateway default.
+    timeouts:
+      request: 2m30s
+      backendRequest: ""
     # -- Paths exposed on the Mimir read route. Each matched with PathPrefix and forwarded as-is to mimir-gateway:80.
     paths:
     - /prometheus/api/v1/labels
@@ -156,6 +172,15 @@ tempo:
     namespace: envoy-gateway-system
   # -- HTTP read route configuration.
   read:
+    # -- Gateway API timeouts on the Tempo HTTP read route rules. Without them Envoy Gateway
+    # cuts requests after 15s. The `request` default is Tempo's search `query_timeout` and
+    # `server.http_server_write_timeout` (30s)
+    # plus 30s, so the backend's own timeout error reaches the client first.
+    # `backendRequest` is optional and must not be longer than `request`.
+    # Leave both empty to keep the Envoy Gateway default.
+    timeouts:
+      request: 1m
+      backendRequest: ""
     # -- Paths exposed on the Tempo read route. Each matched with PathPrefix.
     # The /tempo prefix is stripped before forwarding to tempo-query-frontend:3200
     # (all paths in this list are subject to the prefix-strip rewrite).

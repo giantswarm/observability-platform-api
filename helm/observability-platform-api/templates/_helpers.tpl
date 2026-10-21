@@ -49,3 +49,21 @@ If ingress.tls.secretName is specified, use that instead for custom secret shari
 {{- printf "%s-%s-%s-tls" (include "resource.default.name" $context) $ingress.namespace $hostHash -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Gateway API timeouts block for an HTTPRoute rule, from a <service>.read.timeouts
+value. Renders nothing when both request and backendRequest are empty, leaving
+Envoy Gateway's 15s default in place.
+*/}}
+{{- define "route.timeouts" -}}
+{{- $t := . | default dict -}}
+{{- if or $t.request $t.backendRequest -}}
+timeouts:
+  {{- with $t.request }}
+  request: {{ . | quote }}
+  {{- end }}
+  {{- with $t.backendRequest }}
+  backendRequest: {{ . | quote }}
+  {{- end }}
+{{- end -}}
+{{- end -}}
