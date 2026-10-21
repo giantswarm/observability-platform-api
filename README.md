@@ -137,13 +137,13 @@ The API authenticates requests. It does not isolate tenants:
 
 - The JWT is validated, but it is not tied to a tenant. The tenant is whatever the client sends in `X-Scope-OrgID`, and it reaches the backend unchanged.
 - So any valid token can read and write any tenant of Loki, Mimir and Tempo. The same is true of the Basic Auth routes.
-- A piped header such as `X-Scope-OrgID: a|b` reaches Loki. When the Loki read target runs with `-querier.multi-tenant-queries-enabled`, one query returns data from several tenants.
+- A piped header such as `X-Scope-OrgID: a|b` reaches Loki. When the Loki read target runs with `-querier.multi-tenant-queries-enabled`, one query returns data from several tenants. Mimir does the same when `-tenant-federation.enabled` is set.
 
 Only give tokens to clients that may access every tenant on the installation.
 
 ### Known limitations
 
-- Loki's Prometheus-compatible rules API (`/prometheus/api/v1/rules` and `/prometheus/api/v1/alerts` on Loki) is not reachable through the API when Loki and Mimir share a hostname: `/prometheus/api/v1/rules` goes to Mimir. Grafana alerting on Loki-managed rules is not supported through the API. Use `/loki/api/v1/rules` to list Loki rules.
+- Loki's Prometheus-compatible rules API (`/prometheus/api/v1/rules` and `/prometheus/api/v1/alerts` on Loki) is not exposed. When Loki and Mimir share a hostname (the default), `/prometheus/api/v1/rules` goes to Mimir. So Grafana cannot list Loki-managed alert rules through the API. Use `/loki/api/v1/rules` to list Loki rules.
 
 ## Architecture Notes
 

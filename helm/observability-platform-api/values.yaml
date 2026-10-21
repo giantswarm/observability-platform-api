@@ -77,7 +77,7 @@ loki:
     # as-is to loki-gateway:80. An entry is either a path string, which allows GET only, or `{path, methods}`,
     # where methods is a list of GET, HEAD and POST. Other methods get a 404 from Envoy.
     # Only allow POST where Loki treats POST as a read: POST on /loki/api/v1/rules creates ruler rules.
-    # At most 64 path and method pairs in total.
+    # At least one entry (a rule without matches would match every path), and at most 64 path and method pairs.
     paths:
     - path: /loki/api/v1/labels
       methods: [GET, POST]

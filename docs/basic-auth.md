@@ -32,9 +32,9 @@ JWT read routes method for method: for example `/loki/api/v1/rules` is `GET`
 only.
 
 `X-Scope-OrgID` is enforced exactly as on the JWT routes: present and non-empty,
-or `401` with the body `Missing X-Scope-OrgID header`. Basic Auth authenticates the caller; it does not scope them to a
-tenant — the same is true of the JWT routes, see
-[Tenancy](../README.md#tenancy).
+or `401` with the body `Missing X-Scope-OrgID header`. Basic Auth authenticates
+the caller; it does not scope them to a tenant — the same is true of the JWT
+routes, see [Tenancy](../README.md#tenancy).
 
 > **Prerequisite:** the `giantswarm-default` Gateway's wildcard listener and
 > certificate span a single label, so `basicAuth.hostname` must be of the form
