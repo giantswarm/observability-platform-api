@@ -38,6 +38,9 @@ spec:
     - name: {{ $service.read.backendService }}
       namespace: {{ $service.namespace }}
       port: {{ $service.read.backendPort }}
+    {{- with include "route.timeouts" $service.read.timeouts }}
+    {{- . | nindent 4 }}
+    {{- end }}
     matches:
     {{- range $service.read.paths }}
     - path:
@@ -58,6 +61,9 @@ spec:
     - name: {{ $service.read.backendService }}
       namespace: {{ $service.namespace }}
       port: {{ $service.read.backendPort }}
+    {{- with include "route.timeouts" $service.read.timeouts }}
+    {{- . | nindent 4 }}
+    {{- end }}
     filters:
     - type: ExtensionRef
       extensionRef:

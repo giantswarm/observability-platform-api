@@ -35,6 +35,9 @@ spec:
     - name: {{ .Values.mimir.read.backendService }}
       namespace: {{ .Values.mimir.namespace }}
       port: {{ .Values.mimir.read.backendPort }}
+    {{- with include "route.timeouts" .Values.mimir.read.timeouts }}
+    {{- . | nindent 4 }}
+    {{- end }}
     matches:
     {{- range .Values.mimir.read.paths }}
     - path:
@@ -55,6 +58,9 @@ spec:
     - name: {{ .Values.mimir.read.backendService }}
       namespace: {{ .Values.mimir.namespace }}
       port: {{ .Values.mimir.read.backendPort }}
+    {{- with include "route.timeouts" .Values.mimir.read.timeouts }}
+    {{- . | nindent 4 }}
+    {{- end }}
     filters:
     - type: ExtensionRef
       extensionRef:
