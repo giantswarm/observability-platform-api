@@ -123,13 +123,25 @@ for p in \
   /loki/api/v1/query_range \
   /loki/api/v1/index/stats \
   /loki/api/v1/series \
-  /loki/api/v1/detected_labels; do
+  /loki/api/v1/detected_labels \
+  /loki/api/v1/detected_field/service_name/values \
+  /loki/api/v1/status/buildinfo \
+  /loki/api/v1/drilldown-limits; do
   echo "$p → $(curl -so /dev/null -w '%{http_code}' "$BASE$p" -H "$AUTH" -H "$SCOPE")"
 done
 # expect: 200 or 400 (params required) — not 401/403
+
+# Queries also accept POST
+curl -si -X POST "$BASE/loki/api/v1/query_range" -H "$AUTH" -H "$SCOPE" \
+  --data-urlencode 'query={job=~".+"}'                       # expect 200
+
+# The read route is read-only: ruler writes never reach Loki
+curl -si -X POST "$BASE/loki/api/v1/rules/test-ns" -H "$AUTH" -H "$SCOPE" \
+  -H 'Content-Type: application/yaml' --data-binary ':::not yaml'   # expect 404 from Envoy
+curl -si -X DELETE "$BASE/loki/api/v1/rules/test-ns" -H "$AUTH" -H "$SCOPE"   # expect 404 from Envoy
 ```
 
-Note: `/loki/api/v1/rules` is a new path not present in the old NGINX config.
+Note: `/loki/api/v1/rules` is a new path not present in the old NGINX config. It allows GET only.
 
 ### Loki write
 

@@ -5,10 +5,11 @@ One HTTPRoute per enabled service (Mimir, Loki) exposing that service's
 existing read paths on basicAuth.hostname. The paths, backend service and
 backend port are reused from <service>.read so the two hostnames never drift
 apart — the only difference between these routes and the JWT ones is the
-hostname they answer on and the SecurityPolicy attached to them.
+hostname they answer on and the SecurityPolicy attached to them. The allowed
+methods come from the same list, so these routes stay read-only.
 
-Rule 1: matches path + X-Scope-OrgID header (regex ^.+$) -> forwards to backend.
-Rule 2: matches path only (no header) -> returns 401 via HTTPRouteFilter.
+Rule 1: matches path + method + X-Scope-OrgID header (regex ^.+$) -> forwards to backend.
+Rule 2: matches path + method only (no header) -> returns 401 via HTTPRouteFilter.
 
 The headers-check HTTPRouteFilter is this directory's own (see filters.yaml),
 not the one used by the JWT routes, so the feature can be removed without
@@ -18,6 +19,7 @@ touching any existing template.
 {{- range $name := list "mimir" "loki" }}
 {{- $service := index $.Values $name }}
 {{- if $service.enabled }}
+{{- $matches := (include "read.matches" (dict "paths" $service.read.paths "name" (printf "%s.read.paths" $name)) | fromYaml).matches }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -39,10 +41,11 @@ spec:
       namespace: {{ $service.namespace }}
       port: {{ $service.read.backendPort }}
     matches:
-    {{- range $service.read.paths }}
+    {{- range $matches }}
     - path:
         type: PathPrefix
-        value: {{ . }}
+        value: {{ .path }}
+      method: {{ .method }}
       headers:
       - name: X-Scope-OrgID
         value: "^.+$"
@@ -65,10 +68,11 @@ spec:
         kind: HTTPRouteFilter
         name: {{ include "resource.default.name" $ }}-{{ $name }}-basicauth-headers-check
     matches:
-    {{- range $service.read.paths }}
+    {{- range $matches }}
     - path:
         type: PathPrefix
-        value: {{ . }}
+        value: {{ .path }}
+      method: {{ .method }}
     {{- end }}
 {{- end }}
 {{- end }}

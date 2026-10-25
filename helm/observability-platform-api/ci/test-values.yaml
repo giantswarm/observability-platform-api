@@ -23,7 +23,8 @@ loki:
   read:
     paths:
     - /loki/api/v1/labels
-    - /loki/api/v1/query
+    - path: /loki/api/v1/query
+      methods: [GET, POST]
   write:
     paths:
     - /loki/api/v1/push
@@ -40,7 +41,8 @@ mimir:
   read:
     paths:
     - /prometheus/api/v1/labels
-    - /prometheus/api/v1/query
+    - path: /prometheus/api/v1/query
+      methods: [GET, POST]
   write:
     paths:
     - /otlp/v1/metrics

@@ -3,16 +3,23 @@ Loki read API routes (loki.enabled=true)
 
 Resources:
   - HTTPRoute: routes read requests to loki-gateway:80 in loki.namespace.
-    Rule 1: matches path + X-Scope-OrgID header (regex ^.+$) → forwards to backend.
-    Rule 2: matches path only (no header) → returns 401 via HTTPRouteFilter.
+    Rule 1: matches path + method + X-Scope-OrgID header (regex ^.+$) → forwards to backend.
+    Rule 2: matches path + method only (no header) → returns 401 via HTTPRouteFilter.
+    Any other method gets Envoy's 404, so POST and DELETE on /loki/api/v1/rules
+    (create and delete ruler rules) never reach Loki.
 
-Exposed paths (configured via loki.read.paths):
-  /loki/api/v1/labels, /loki/api/v1/label, /loki/api/v1/rules,
-  /loki/api/v1/query, /loki/api/v1/query_range, /loki/api/v1/index,
-  /loki/api/v1/series, /loki/api/v1/detected_labels
+Exposed paths and methods (configured via loki.read.paths):
+  GET and POST: /loki/api/v1/query, /loki/api/v1/query_range, /loki/api/v1/labels,
+    /loki/api/v1/label, /loki/api/v1/series, /loki/api/v1/index (and index/stats,
+    index/volume, index/volume_range), /loki/api/v1/format_query,
+    /loki/api/v1/detected_labels, /loki/api/v1/detected_fields,
+    /loki/api/v1/detected_field, /loki/api/v1/patterns
+  GET only: /loki/api/v1/rules, /loki/api/v1/tail, /loki/api/v1/status/buildinfo,
+    /loki/api/v1/drilldown-limits
 */}}
 {{- if and .Values.loki.enabled .Values.auth.jwt.providers -}}
 ---
+{{- $matches := (include "read.matches" (dict "paths" .Values.loki.read.paths "name" "loki.read.paths") | fromYaml).matches }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -35,10 +42,11 @@ spec:
       namespace: {{ .Values.loki.namespace }}
       port: {{ .Values.loki.read.backendPort }}
     matches:
-    {{- range .Values.loki.read.paths }}
+    {{- range $matches }}
     - path:
         type: PathPrefix
-        value: {{ . }}
+        value: {{ .path }}
+      method: {{ .method }}
       headers:
       - name: X-Scope-OrgID
         value: "^.+$"
@@ -61,9 +69,10 @@ spec:
         kind: HTTPRouteFilter
         name: {{ include "resource.default.name" . }}-loki-headers-check
     matches:
-    {{- range .Values.loki.read.paths }}
+    {{- range $matches }}
     - path:
         type: PathPrefix
-        value: {{ . }}
+        value: {{ .path }}
+      method: {{ .method }}
     {{- end }}
 {{- end }}
