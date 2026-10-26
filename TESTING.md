@@ -112,7 +112,7 @@ Backend: `loki-gateway:80`. No path rewrite.
 ```bash
 # Full auth scenario test on representative path
 curl -si "$BASE/loki/api/v1/labels" -H "$AUTH" -H "$SCOPE"  # expect 2xx (JWT)
-curl -si "$BASE/loki/api/v1/labels" -H "$AUTH"               # expect 400
+curl -si "$BASE/loki/api/v1/labels" -H "$AUTH"               # expect 400 (missing X-Scope-OrgID)
 curl -si "$BASE/loki/api/v1/labels" -H "$SCOPE"              # expect 401
 
 # Smoke test all paths (valid auth)
@@ -157,7 +157,7 @@ Backend: `mimir-gateway:80`. No path rewrite.
 
 ```bash
 curl -si "$BASE/prometheus/api/v1/labels" -H "$AUTH" -H "$SCOPE"  # expect 2xx (JWT)
-curl -si "$BASE/prometheus/api/v1/labels" -H "$AUTH"               # expect 400
+curl -si "$BASE/prometheus/api/v1/labels" -H "$AUTH"               # expect 400 (missing X-Scope-OrgID)
 curl -si "$BASE/prometheus/api/v1/labels" -H "$SCOPE"              # expect 401
 
 for p in \
@@ -185,7 +185,7 @@ curl -si -X POST "$BASE/prometheus/api/v1/push" \
   --data-binary @/dev/null
 # expect: 204 or 400 (backend validates payload) — not 401
 
-curl -si -X POST "$BASE/prometheus/api/v1/push" -H "$AUTH"   # expect 400
+curl -si -X POST "$BASE/prometheus/api/v1/push" -H "$AUTH"   # expect 400 (missing X-Scope-OrgID)
 curl -si -X POST "$BASE/prometheus/api/v1/push" -H "$SCOPE"  # expect 401
 ```
 
@@ -229,7 +229,7 @@ curl -s "$BASE/prometheus/api/v1/query" \
   --data-urlencode 'query=test_counter_total{job="my-namespace/otlp-test"}' | jq '.data.result'
 # expect: non-empty result with value 1
 
-curl -si -X POST "$BASE/otlp/v1/metrics" -H "$AUTH"   # expect 400
+curl -si -X POST "$BASE/otlp/v1/metrics" -H "$AUTH"   # expect 400 (missing X-Scope-OrgID)
 curl -si -X POST "$BASE/otlp/v1/metrics" -H "$SCOPE"  # expect 401
 ```
 
@@ -239,7 +239,7 @@ Backend: `tempo-query-frontend:3200`. Path rewrite: `/tempo` prefix stripped bef
 
 ```bash
 curl -si "$BASE/tempo/api/echo" -H "$AUTH" -H "$SCOPE"  # expect 200, body: "echo" (JWT)
-curl -si "$BASE/tempo/api/echo" -H "$AUTH"               # expect 400
+curl -si "$BASE/tempo/api/echo" -H "$AUTH"               # expect 400 (missing X-Scope-OrgID)
 curl -si "$BASE/tempo/api/echo" -H "$SCOPE"              # expect 401
 
 for p in \
@@ -292,7 +292,7 @@ curl -s "$BASE/loki/api/v1/query_range" \
   | jq '.data.result'
 # expect: non-empty array with your log line
 
-curl -si -X POST "$BASE/otlp/v1/logs" -H "$AUTH"   # expect 400
+curl -si -X POST "$BASE/otlp/v1/logs" -H "$AUTH"   # expect 400 (missing X-Scope-OrgID)
 curl -si -X POST "$BASE/otlp/v1/logs" -H "$SCOPE"  # expect 401
 ```
 
@@ -491,7 +491,7 @@ SCOPE="X-Scope-OrgID: $ORG"
 ```bash
 # Mimir read
 curl -si -u "$BA_USER:$BA_PASS" "$BA_BASE/prometheus/api/v1/labels" -H "$SCOPE"   # expect 2xx
-curl -si -u "$BA_USER:$BA_PASS" "$BA_BASE/prometheus/api/v1/labels"                # expect 400
+curl -si -u "$BA_USER:$BA_PASS" "$BA_BASE/prometheus/api/v1/labels"                # expect 400 (missing X-Scope-OrgID)
 curl -si "$BA_BASE/prometheus/api/v1/labels" -H "$SCOPE"                           # expect 401
 curl -si -u "$BA_USER:wrong" "$BA_BASE/prometheus/api/v1/labels" -H "$SCOPE"       # expect 401
 

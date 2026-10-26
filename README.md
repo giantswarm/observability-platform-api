@@ -94,7 +94,7 @@ The table below describes the JWT domain. When `basicAuth.enabled` is set, the M
 
 All routes (read and write) require JWT Bearer token authentication via Envoy Gateway `SecurityPolicy`.
 
-All routes additionally enforce that the `X-Scope-OrgID` header is present and non-empty — requests missing it receive a `400` with the body `Missing X-Scope-OrgID header`. A missing or invalid credential receives a `401`.
+All routes enforce that the `X-Scope-OrgID` header to be present and non-empty. Requests missing it receive a `400` with the body `Missing X-Scope-OrgID header`. An invalid credential receives a `401`.
 
 Optionally, the Mimir and Loki *read* paths can additionally be exposed on a second hostname behind HTTP Basic Auth, for clients that cannot obtain an OIDC token — see [Basic Auth read routes](docs/basic-auth.md). This is disabled by default.
 
