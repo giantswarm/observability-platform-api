@@ -102,7 +102,7 @@ For every path, the following scenarios are validated:
 | Scenario | Expected (HTTP) | Expected (gRPC) |
 |----------|----------------|-----------------|
 | Valid JWT + `X-Scope-OrgID` present | 2xx (backend response) | grpc-status: 12 (backend reached) |
-| Valid JWT, `X-Scope-OrgID` missing | 401 | no-route rejection (not a strict 401) |
+| Valid JWT, `X-Scope-OrgID` missing | 400 | no-route rejection (not a 400) |
 | No auth credential | 401 | grpc-status: 16 (UNAUTHENTICATED) |
 
 ### Loki read
@@ -112,7 +112,7 @@ Backend: `loki-gateway:80`. No path rewrite.
 ```bash
 # Full auth scenario test on representative path
 curl -si "$BASE/loki/api/v1/labels" -H "$AUTH" -H "$SCOPE"  # expect 2xx (JWT)
-curl -si "$BASE/loki/api/v1/labels" -H "$AUTH"               # expect 401
+curl -si "$BASE/loki/api/v1/labels" -H "$AUTH"               # expect 400
 curl -si "$BASE/loki/api/v1/labels" -H "$SCOPE"              # expect 401
 
 # Smoke test all paths (valid auth)
@@ -144,7 +144,7 @@ curl -si -X POST "$BASE/loki/api/v1/push" \
 
 curl -si -X POST "$BASE/loki/api/v1/push" \
   -H "$AUTH" -H "Content-Type: application/json" -d "$PAYLOAD"
-# expect: 401 (missing X-Scope-OrgID)
+# expect: 400 (missing X-Scope-OrgID)
 
 curl -si -X POST "$BASE/loki/api/v1/push" \
   -H "$SCOPE" -H "Content-Type: application/json" -d "$PAYLOAD"
@@ -157,7 +157,7 @@ Backend: `mimir-gateway:80`. No path rewrite.
 
 ```bash
 curl -si "$BASE/prometheus/api/v1/labels" -H "$AUTH" -H "$SCOPE"  # expect 2xx (JWT)
-curl -si "$BASE/prometheus/api/v1/labels" -H "$AUTH"               # expect 401
+curl -si "$BASE/prometheus/api/v1/labels" -H "$AUTH"               # expect 400
 curl -si "$BASE/prometheus/api/v1/labels" -H "$SCOPE"              # expect 401
 
 for p in \
@@ -185,7 +185,7 @@ curl -si -X POST "$BASE/prometheus/api/v1/push" \
   --data-binary @/dev/null
 # expect: 204 or 400 (backend validates payload) — not 401
 
-curl -si -X POST "$BASE/prometheus/api/v1/push" -H "$AUTH"   # expect 401
+curl -si -X POST "$BASE/prometheus/api/v1/push" -H "$AUTH"   # expect 400
 curl -si -X POST "$BASE/prometheus/api/v1/push" -H "$SCOPE"  # expect 401
 ```
 
@@ -229,7 +229,7 @@ curl -s "$BASE/prometheus/api/v1/query" \
   --data-urlencode 'query=test_counter_total{job="my-namespace/otlp-test"}' | jq '.data.result'
 # expect: non-empty result with value 1
 
-curl -si -X POST "$BASE/otlp/v1/metrics" -H "$AUTH"   # expect 401
+curl -si -X POST "$BASE/otlp/v1/metrics" -H "$AUTH"   # expect 400
 curl -si -X POST "$BASE/otlp/v1/metrics" -H "$SCOPE"  # expect 401
 ```
 
@@ -239,7 +239,7 @@ Backend: `tempo-query-frontend:3200`. Path rewrite: `/tempo` prefix stripped bef
 
 ```bash
 curl -si "$BASE/tempo/api/echo" -H "$AUTH" -H "$SCOPE"  # expect 200, body: "echo" (JWT)
-curl -si "$BASE/tempo/api/echo" -H "$AUTH"               # expect 401
+curl -si "$BASE/tempo/api/echo" -H "$AUTH"               # expect 400
 curl -si "$BASE/tempo/api/echo" -H "$SCOPE"              # expect 401
 
 for p in \
@@ -292,7 +292,7 @@ curl -s "$BASE/loki/api/v1/query_range" \
   | jq '.data.result'
 # expect: non-empty array with your log line
 
-curl -si -X POST "$BASE/otlp/v1/logs" -H "$AUTH"   # expect 401
+curl -si -X POST "$BASE/otlp/v1/logs" -H "$AUTH"   # expect 400
 curl -si -X POST "$BASE/otlp/v1/logs" -H "$SCOPE"  # expect 401
 ```
 
@@ -304,7 +304,7 @@ Backend: `tempo-query-frontend:9095`. Separate `GRPCRoute` from the HTTP routes 
 > Gateway's SecurityPolicy JWT enforcement does not correctly apply to gRPC traffic routed
 > via HTTPRoute. `GRPCRoute` does not support `HTTPRouteFilter` via `ExtensionRef`, so the
 > single rule only matches requests that include `X-Scope-OrgID`. Requests missing the header
-> do not match any rule and are rejected by Envoy (no route match — not a strict 401).
+> do not match any rule and are rejected by Envoy (no route match — not a 400).
 >
 > **Note on HTTP/2**: If gRPC calls return `INTERNAL` errors, a `BackendTrafficPolicy` with
 > `http2.enabled: true` may be needed on the `tempo-read-api-grpc` GRPCRoute.
@@ -322,7 +322,7 @@ curl -si --http2 -X POST "https://$GRPC_HOST/tempopb.StreamingQuerier/SearchTags
   --data-binary $'\x00\x00\x00\x00\x00'
 # expect: grpc-status: 12 (not 16)
 
-# Missing X-Scope-OrgID — no rule matches, Envoy rejects (not a strict 401 for gRPC)
+# Missing X-Scope-OrgID — no rule matches, Envoy rejects (not a 400 for gRPC)
 curl -si --http2 -X POST "https://$GRPC_HOST/tempopb.StreamingQuerier/SearchTagsV2" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/grpc" \
@@ -350,7 +350,7 @@ curl -si -X POST "$BASE/v1/traces" \
 
 curl -si -X POST "$BASE/v1/traces" \
   -H "$AUTH" -H "Content-Type: application/json" -d '{}'
-# expect: 401
+# expect: 400 (missing X-Scope-OrgID)
 
 curl -si -X POST "$BASE/v1/traces" \
   -H "$SCOPE" -H "Content-Type: application/json" -d '{}'
@@ -361,7 +361,7 @@ curl -si -X POST "$BASE/v1/traces" \
 
 Backend: `tempo-distributor:4317`. Separate `GRPCRoute` — routes directly to `tempo-distributor` (nginx does not handle gRPC).
 
-> **Note on missing `X-Scope-OrgID`**: `GRPCRoute` does not support `HTTPRouteFilter` via `ExtensionRef`, so requests missing `X-Scope-OrgID` get a no-route rejection rather than a strict 401.
+> **Note on missing `X-Scope-OrgID`**: `GRPCRoute` does not support `HTTPRouteFilter` via `ExtensionRef`, so requests missing `X-Scope-OrgID` get a no-route rejection rather than a 400.
 
 ```bash
 # With auth and X-Scope-OrgID — reaches backend
@@ -482,7 +482,7 @@ SCOPE="X-Scope-OrgID: $ORG"
 | Scenario | Expected |
 |----------|----------|
 | Valid Basic credentials + `X-Scope-OrgID` present | 2xx (backend response) |
-| Valid Basic credentials, `X-Scope-OrgID` missing | 401 |
+| Valid Basic credentials, `X-Scope-OrgID` missing | 400 |
 | No credential | 401 |
 | Wrong password | 401 |
 | Valid JWT (Bearer) instead of Basic | 401 — this hostname only accepts Basic |
@@ -491,7 +491,7 @@ SCOPE="X-Scope-OrgID: $ORG"
 ```bash
 # Mimir read
 curl -si -u "$BA_USER:$BA_PASS" "$BA_BASE/prometheus/api/v1/labels" -H "$SCOPE"   # expect 2xx
-curl -si -u "$BA_USER:$BA_PASS" "$BA_BASE/prometheus/api/v1/labels"                # expect 401
+curl -si -u "$BA_USER:$BA_PASS" "$BA_BASE/prometheus/api/v1/labels"                # expect 400
 curl -si "$BA_BASE/prometheus/api/v1/labels" -H "$SCOPE"                           # expect 401
 curl -si -u "$BA_USER:wrong" "$BA_BASE/prometheus/api/v1/labels" -H "$SCOPE"       # expect 401
 

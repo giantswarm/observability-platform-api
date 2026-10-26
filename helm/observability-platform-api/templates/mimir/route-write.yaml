@@ -6,10 +6,10 @@ Resources:
     For each path in mimir.writeRewritePaths:
       Rule (with header): matches path + X-Scope-OrgID header → rewrites path (strips /prometheus
                           prefix) and forwards to backend.
-      Rule (no header):   matches path only → returns 401 via HTTPRouteFilter.
+      Rule (no header):   matches path only → returns 400 via HTTPRouteFilter.
     For each path in mimir.writePassthroughPaths:
       Rule (with header): matches path + X-Scope-OrgID header → forwards to backend (no rewrite).
-      Rule (no header):   matches path only → returns 401 via HTTPRouteFilter.
+      Rule (no header):   matches path only → returns 400 via HTTPRouteFilter.
 
 Exposed paths:
   /prometheus/api/v1/push  (rewritten to /api/v1/push upstream; configured via mimir.writeRewritePaths)

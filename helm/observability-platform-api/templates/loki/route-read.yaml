@@ -4,7 +4,7 @@ Loki read API routes (loki.enabled=true)
 Resources:
   - HTTPRoute: routes read requests to loki-gateway:80 in loki.namespace.
     Rule 1: matches path + X-Scope-OrgID header (regex ^.+$) → forwards to backend.
-    Rule 2: matches path only (no header) → returns 401 via HTTPRouteFilter.
+    Rule 2: matches path only (no header) → returns 400 via HTTPRouteFilter.
 
 Exposed paths (configured via loki.read.paths):
   /loki/api/v1/labels, /loki/api/v1/label, /loki/api/v1/rules,

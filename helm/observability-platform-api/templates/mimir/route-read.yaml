@@ -4,7 +4,7 @@ Mimir read API routes (mimir.enabled=true)
 Resources:
   - HTTPRoute: routes read requests to mimir-gateway:80 in mimir.namespace.
     Rule 1: matches path + X-Scope-OrgID header (regex ^.+$) → forwards to backend.
-    Rule 2: matches path only (no header) → returns 401 via HTTPRouteFilter.
+    Rule 2: matches path only (no header) → returns 400 via HTTPRouteFilter.
 
 Exposed paths (configured via mimir.readPaths):
   /prometheus/api/v1/labels, /prometheus/api/v1/label, /prometheus/api/v1/rules,

@@ -2,7 +2,7 @@
 Loki HTTPRouteFilters (loki.enabled=true)
 
 Resources:
-  - HTTPRouteFilter (loki-headers-check): returns 401 when X-Scope-OrgID header is missing.
+  - HTTPRouteFilter (loki-headers-check): returns 400 when X-Scope-OrgID header is missing.
     Shared by both loki-read-api and loki-write-api HTTPRoutes.
 */}}
 {{- if and .Values.loki.enabled .Values.auth.jwt.providers -}}
@@ -17,7 +17,7 @@ metadata:
 spec:
   directResponse:
     contentType: text/plain
-    statusCode: 401
+    statusCode: 400
     body:
       type: Inline
       inline: "Missing X-Scope-OrgID header"

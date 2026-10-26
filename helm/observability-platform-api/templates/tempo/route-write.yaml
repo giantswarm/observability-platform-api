@@ -5,7 +5,7 @@ Resources:
   - HTTPRoute (tempo-otlp-write-api): routes OTLP trace ingestion to tempo-distributor:4318.
     For each path in tempo.writePaths:
       Rule (with header): matches path + X-Scope-OrgID header → forwards to backend.
-      Rule (no header):   matches path only → returns 401 via HTTPRouteFilter.
+      Rule (no header):   matches path only → returns 400 via HTTPRouteFilter.
 
 Exposed paths (configured via tempo.writePaths):
   /v1/traces  (OTLP HTTP trace ingestion)

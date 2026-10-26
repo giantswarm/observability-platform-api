@@ -2,7 +2,7 @@
 Mimir HTTPRouteFilters (mimir.enabled=true)
 
 Resources:
-  - HTTPRouteFilter (mimir-headers-check): returns 401 when X-Scope-OrgID header is missing.
+  - HTTPRouteFilter (mimir-headers-check): returns 400 when X-Scope-OrgID header is missing.
     Shared by both mimir-read-api and mimir-write-api HTTPRoutes.
   - HTTPRouteFilter (mimir-rewrite): strips the /prometheus prefix before forwarding to backend
     (/prometheus/api/v1/push → /api/v1/push).
@@ -19,7 +19,7 @@ metadata:
 spec:
   directResponse:
     contentType: text/plain
-    statusCode: 401
+    statusCode: 400
     body:
       type: Inline
       inline: "Missing X-Scope-OrgID header"

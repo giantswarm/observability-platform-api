@@ -94,7 +94,7 @@ The table below describes the JWT domain. When `basicAuth.enabled` is set, the M
 
 All routes (read and write) require JWT Bearer token authentication via Envoy Gateway `SecurityPolicy`.
 
-All routes additionally enforce that the `X-Scope-OrgID` header is present and non-empty — requests missing it receive a `401`.
+All routes additionally enforce that the `X-Scope-OrgID` header is present and non-empty — requests missing it receive a `400` with the body `Missing X-Scope-OrgID header`. A missing or invalid credential receives a `401`.
 
 Optionally, the Mimir and Loki *read* paths can additionally be exposed on a second hostname behind HTTP Basic Auth, for clients that cannot obtain an OIDC token — see [Basic Auth read routes](docs/basic-auth.md). This is disabled by default.
 
@@ -142,7 +142,7 @@ This app creates multiple `HTTPRoute` and `GRPCRoute` resources (one per service
 - All routes share the same hostname and `X-Scope-OrgID` enforcement
 - JWT providers (`auth.jwt.providers`) are shared across all services
 - JWT validation is done inline by Envoy Gateway — no external auth service required
-- gRPC routes (`GRPCRoute`) do not support `HTTPRouteFilter` via `ExtensionRef`, so missing `X-Scope-OrgID` on gRPC requests results in a no-route rejection rather than a strict 401
+- gRPC routes (`GRPCRoute`) do not support `HTTPRouteFilter` via `ExtensionRef`, so missing `X-Scope-OrgID` on gRPC requests results in a no-route rejection rather than a 400
 
 ## Configuration & Deployment
 

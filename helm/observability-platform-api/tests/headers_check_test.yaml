@@ -1,0 +1,66 @@
+suite: headers-check filters
+# A request without X-Scope-OrgID is malformed, not unauthenticated: every
+# headers-check filter answers 400. 401 stays with the SecurityPolicies.
+release:
+  name: observability-platform-api
+values:
+  - ../ci/test-values.yaml
+tests:
+  - it: returns 400 on the mimir JWT headers-check filter
+    template: templates/mimir/filters.yaml
+    documentSelector:
+      path: metadata.name
+      value: observability-platform-api-mimir-headers-check
+    asserts:
+      - isKind:
+          of: HTTPRouteFilter
+      - equal:
+          path: spec.directResponse.statusCode
+          value: 400
+      - equal:
+          path: spec.directResponse.body.inline
+          value: Missing X-Scope-OrgID header
+
+  - it: returns 400 on the loki JWT headers-check filter
+    template: templates/loki/filters.yaml
+    documentSelector:
+      path: metadata.name
+      value: observability-platform-api-loki-headers-check
+    asserts:
+      - isKind:
+          of: HTTPRouteFilter
+      - equal:
+          path: spec.directResponse.statusCode
+          value: 400
+      - equal:
+          path: spec.directResponse.body.inline
+          value: Missing X-Scope-OrgID header
+
+  - it: returns 400 on the tempo JWT headers-check filter
+    template: templates/tempo/filters.yaml
+    documentSelector:
+      path: metadata.name
+      value: observability-platform-api-tempo-headers-check
+    asserts:
+      - isKind:
+          of: HTTPRouteFilter
+      - equal:
+          path: spec.directResponse.statusCode
+          value: 400
+      - equal:
+          path: spec.directResponse.body.inline
+          value: Missing X-Scope-OrgID header
+
+  - it: returns 400 on the Basic Auth headers-check filters
+    template: templates/basicauth/filters.yaml
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: HTTPRouteFilter
+      - equal:
+          path: spec.directResponse.statusCode
+          value: 400
+      - equal:
+          path: spec.directResponse.body.inline
+          value: Missing X-Scope-OrgID header

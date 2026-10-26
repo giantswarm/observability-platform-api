@@ -29,7 +29,8 @@ headers-check `HTTPRouteFilter`. A single `ReferenceGrant` in
 `usersSecret.namespace` lets both SecurityPolicies read the one Secret.
 
 `X-Scope-OrgID` is enforced exactly as on the JWT routes: present and non-empty,
-or `401`. Basic Auth authenticates the caller; it does not scope them to a
+or `400` (`Missing X-Scope-OrgID header`). A missing or wrong credential gets
+`401`. Basic Auth authenticates the caller; it does not scope them to a
 tenant — the same is true of the JWT routes today.
 
 > **Prerequisite:** the `giantswarm-default` Gateway's wildcard listener and
@@ -133,11 +134,12 @@ kubectl get securitypolicy -n mimir <release>-mimir-basicauth -o yaml
 | `secret <ns>/<name> does not exist` | Secret missing, or `ReferenceGrant` not applied |
 | `secret <ns>/<name> must contain a non-empty ".htpasswd" key` | Wrong key name, or empty value |
 | Policy accepted, but every request gets `401` | Hash is not `{SHA}` (bcrypt/MD5), or the password does not match |
-| `401` with a valid credential | `X-Scope-OrgID` header missing or empty |
+| `400` with a valid credential | `X-Scope-OrgID` header missing or empty |
 
 `500` means the policy is broken; `401` means the policy is working and the
-credential is not. That distinction is the fastest way to tell a Kubernetes-level
-problem from a credential-level one.
+credential is not; `400` means the credential is fine and the request lacks its
+`X-Scope-OrgID` header. That distinction is the fastest way to tell a
+Kubernetes-level problem from a credential-level one.
 
 If `basicAuth.enabled` is set but `hostname`, `usersSecret.name` or
 `usersSecret.namespace` is empty *in the values*, nothing is rendered at all —

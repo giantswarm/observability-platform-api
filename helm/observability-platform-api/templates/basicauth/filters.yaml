@@ -1,7 +1,7 @@
 {{/*
 Basic Auth headers-check filters (basicAuth.enabled=true)
 
-Returns 401 when the X-Scope-OrgID header is missing, mirroring the enforcement
+Returns 400 when the X-Scope-OrgID header is missing, mirroring the enforcement
 the JWT routes get from <service>/filters.yaml.
 
 These duplicate the per-service headers-check filters rather than reusing them
@@ -25,7 +25,7 @@ metadata:
 spec:
   directResponse:
     contentType: text/plain
-    statusCode: 401
+    statusCode: 400
     body:
       type: Inline
       inline: "Missing X-Scope-OrgID header"

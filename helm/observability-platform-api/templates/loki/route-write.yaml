@@ -5,7 +5,7 @@ Resources:
   - HTTPRoute: routes write requests to loki-gateway:80 in loki.namespace.
     For each path in loki.writePaths:
       Rule (with header): matches path + X-Scope-OrgID header → forwards to backend.
-      Rule (no header):   matches path only → returns 401 via HTTPRouteFilter.
+      Rule (no header):   matches path only → returns 400 via HTTPRouteFilter.
 
 Exposed paths (configured via loki.write.paths):
   /loki/api/v1/push
@@ -51,7 +51,7 @@ spec:
           value: "%REQ(X-Scope-OrgID)%"
     {{- with $.Values.loki.write.requestMirror }}
     {{- if .enabled }}
-    {{- /* This rule only: the one below returns 401 for requests without an
+    {{- /* This rule only: the one below returns 400 for requests without an
            X-Scope-OrgID header, so mirroring it would copy only rejections. */}}
     - type: RequestMirror
       requestMirror:

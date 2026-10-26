@@ -8,7 +8,7 @@ apart — the only difference between these routes and the JWT ones is the
 hostname they answer on and the SecurityPolicy attached to them.
 
 Rule 1: matches path + X-Scope-OrgID header (regex ^.+$) -> forwards to backend.
-Rule 2: matches path only (no header) -> returns 401 via HTTPRouteFilter.
+Rule 2: matches path only (no header) -> returns 400 via HTTPRouteFilter.
 
 The headers-check HTTPRouteFilter is this directory's own (see filters.yaml),
 not the one used by the JWT routes, so the feature can be removed without
