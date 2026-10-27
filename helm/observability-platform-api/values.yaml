@@ -12,6 +12,9 @@ auth:
     # providers:
     # - name: dex
     #   issuer: "https://dex.mycluster.example.com"
+    #   # Required: the token audiences this provider accepts (at most 8).
+    #   audiences:
+    #   - observability-platform-api
     #   remoteJWKS:
     #     uri: "https://dex.mycluster.example.com/keys"
     #   # Best practice: restrict JWT extraction to Bearer tokens only.
@@ -23,12 +26,37 @@ auth:
     #       valuePrefix: "Bearer "
     # - name: azure-ad
     #   issuer: "https://login.microsoftonline.com/<tenant-id>/v2.0"
+    #   audiences:
+    #   - "<application-id-uri>"
     #   remoteJWKS:
     #     uri: "https://login.microsoftonline.com/<tenant-id>/discovery/v2.0/keys"
     #   extractFrom:
     #     headers:
     #     - name: Authorization
     #       valuePrefix: "Bearer "
+  # -- Tenants that may be read and written through the JWT routes. A request is
+  # allowed only when its `X-Scope-OrgID` header equals a tenant `name` exactly and
+  # its token, validated by `provider`, carries one of `values` in `claim`
+  # (default `groups`). Everything else is denied, so an empty list denies all
+  # requests. A header naming several tenants (`a|b`) only matches a tenant
+  # entry with that exact name.
+  tenants: []
+  # Example:
+  # tenants:
+  # - name: acme
+  #   access:
+  #   - provider: dex
+  #     values:
+  #     - "acme:observability-admins"
+  # - name: giantswarm
+  #   access:
+  #   - provider: dex
+  #     values:
+  #     - "giantswarm:admins"
+  #   - provider: azure-ad
+  #     claim: roles
+  #     values:
+  #     - "Observability.ReadWrite"
 
 # -- Read-only Basic Auth routes, exposed on a dedicated hostname.
 #

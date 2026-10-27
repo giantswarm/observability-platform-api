@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add `auth.tenants`: per-tenant access on the Loki, Mimir and Tempo JWT `SecurityPolicy` resources. A request is allowed only when its `X-Scope-OrgID` equals a listed tenant and its token carries one of that tenant's claim values from the listed provider. All other requests get `403`.
+
+### Changed
+
+- Require `audiences` on every `auth.jwt.providers` entry. The render fails without it.
+- A request with a valid token and no `X-Scope-OrgID` header now gets `403` instead of `401`.
+
 ## [0.6.0] - 2026-10-15
 
 ### Changed

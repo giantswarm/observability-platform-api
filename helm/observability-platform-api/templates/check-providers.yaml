@@ -1,9 +1,24 @@
 {{/*
-Guard for the JWT providers. No resource is created from this template.
+Guard for the JWT providers and tenant access. No resource is created from this template.
 
 Every Loki, Mimir and Tempo route needs `auth.jwt.providers`. An empty list fails the
-render when any of them is enabled.
+render when any of them is enabled. Every provider must restrict the token audience,
+and every tenant access entry must name a configured provider.
 */}}
 {{- if and (or .Values.loki.enabled .Values.mimir.enabled .Values.tempo.enabled) (not .Values.auth.jwt.providers) }}
 {{- fail "auth.jwt.providers is empty. loki.enabled, mimir.enabled or tempo.enabled is true. Their routes need at least one OIDC issuer." }}
+{{- end }}
+{{- $providers := list }}
+{{- range .Values.auth.jwt.providers }}
+{{- if not .audiences }}
+{{- fail (printf "auth.jwt.providers[%s] has no audiences. Each provider must list the token audiences it accepts." .name) }}
+{{- end }}
+{{- $providers = append $providers .name }}
+{{- end }}
+{{- range $tenant := .Values.auth.tenants }}
+{{- range $access := $tenant.access }}
+{{- if not (has $access.provider $providers) }}
+{{- fail (printf "auth.tenants[%s] references unknown provider %q." $tenant.name $access.provider) }}
+{{- end }}
+{{- end }}
 {{- end }}

@@ -89,6 +89,7 @@ TOKEN=$(kubectl oidc-login get-token \
 
 ```bash
 BASE="https://observability.<codename>.<base-domain>"
+# A tenant listed in auth.tenants whose access values match a claim in $TOKEN.
 ORG="my-tenant"
 AUTH="Authorization: Bearer $TOKEN"
 SCOPE="X-Scope-OrgID: $ORG"
@@ -101,8 +102,10 @@ For every path, the following scenarios are validated:
 
 | Scenario | Expected (HTTP) | Expected (gRPC) |
 |----------|----------------|-----------------|
-| Valid JWT + `X-Scope-OrgID` present | 2xx (backend response) | grpc-status: 12 (backend reached) |
-| Valid JWT, `X-Scope-OrgID` missing | 401 | no-route rejection (not a strict 401) |
+| Valid JWT + `X-Scope-OrgID` of a tenant the token is granted | 2xx (backend response) | grpc-status: 12 (backend reached) |
+| Valid JWT + `X-Scope-OrgID` of a tenant the token is not granted | 403 | grpc-status: 7 (PERMISSION_DENIED) |
+| Valid JWT for another audience | 403 | grpc-status: 7 (PERMISSION_DENIED) |
+| Valid JWT, `X-Scope-OrgID` missing | 403 | no-route rejection |
 | No auth credential | 401 | grpc-status: 16 (UNAUTHENTICATED) |
 
 ### Loki read
@@ -112,7 +115,7 @@ Backend: `loki-gateway:80`. No path rewrite.
 ```bash
 # Full auth scenario test on representative path
 curl -si "$BASE/loki/api/v1/labels" -H "$AUTH" -H "$SCOPE"  # expect 2xx (JWT)
-curl -si "$BASE/loki/api/v1/labels" -H "$AUTH"               # expect 401
+curl -si "$BASE/loki/api/v1/labels" -H "$AUTH"               # expect 403
 curl -si "$BASE/loki/api/v1/labels" -H "$SCOPE"              # expect 401
 
 # Smoke test all paths (valid auth)
@@ -144,7 +147,7 @@ curl -si -X POST "$BASE/loki/api/v1/push" \
 
 curl -si -X POST "$BASE/loki/api/v1/push" \
   -H "$AUTH" -H "Content-Type: application/json" -d "$PAYLOAD"
-# expect: 401 (missing X-Scope-OrgID)
+# expect: 403 (missing X-Scope-OrgID)
 
 curl -si -X POST "$BASE/loki/api/v1/push" \
   -H "$SCOPE" -H "Content-Type: application/json" -d "$PAYLOAD"
@@ -157,7 +160,7 @@ Backend: `mimir-gateway:80`. No path rewrite.
 
 ```bash
 curl -si "$BASE/prometheus/api/v1/labels" -H "$AUTH" -H "$SCOPE"  # expect 2xx (JWT)
-curl -si "$BASE/prometheus/api/v1/labels" -H "$AUTH"               # expect 401
+curl -si "$BASE/prometheus/api/v1/labels" -H "$AUTH"               # expect 403
 curl -si "$BASE/prometheus/api/v1/labels" -H "$SCOPE"              # expect 401
 
 for p in \
@@ -185,7 +188,7 @@ curl -si -X POST "$BASE/prometheus/api/v1/push" \
   --data-binary @/dev/null
 # expect: 204 or 400 (backend validates payload) — not 401
 
-curl -si -X POST "$BASE/prometheus/api/v1/push" -H "$AUTH"   # expect 401
+curl -si -X POST "$BASE/prometheus/api/v1/push" -H "$AUTH"   # expect 403
 curl -si -X POST "$BASE/prometheus/api/v1/push" -H "$SCOPE"  # expect 401
 ```
 
@@ -229,7 +232,7 @@ curl -s "$BASE/prometheus/api/v1/query" \
   --data-urlencode 'query=test_counter_total{job="my-namespace/otlp-test"}' | jq '.data.result'
 # expect: non-empty result with value 1
 
-curl -si -X POST "$BASE/otlp/v1/metrics" -H "$AUTH"   # expect 401
+curl -si -X POST "$BASE/otlp/v1/metrics" -H "$AUTH"   # expect 403
 curl -si -X POST "$BASE/otlp/v1/metrics" -H "$SCOPE"  # expect 401
 ```
 
@@ -239,7 +242,7 @@ Backend: `tempo-query-frontend:3200`. Path rewrite: `/tempo` prefix stripped bef
 
 ```bash
 curl -si "$BASE/tempo/api/echo" -H "$AUTH" -H "$SCOPE"  # expect 200, body: "echo" (JWT)
-curl -si "$BASE/tempo/api/echo" -H "$AUTH"               # expect 401
+curl -si "$BASE/tempo/api/echo" -H "$AUTH"               # expect 403
 curl -si "$BASE/tempo/api/echo" -H "$SCOPE"              # expect 401
 
 for p in \
@@ -292,7 +295,7 @@ curl -s "$BASE/loki/api/v1/query_range" \
   | jq '.data.result'
 # expect: non-empty array with your log line
 
-curl -si -X POST "$BASE/otlp/v1/logs" -H "$AUTH"   # expect 401
+curl -si -X POST "$BASE/otlp/v1/logs" -H "$AUTH"   # expect 403
 curl -si -X POST "$BASE/otlp/v1/logs" -H "$SCOPE"  # expect 401
 ```
 

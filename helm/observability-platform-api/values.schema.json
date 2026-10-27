@@ -14,13 +14,20 @@
                             "description": "List of trusted JWT providers. Required when any service is enabled.",
                             "items": {
                                 "type": "object",
-                                "required": ["name", "issuer", "remoteJWKS"],
+                                "required": ["name", "issuer", "audiences", "remoteJWKS"],
                                 "properties": {
                                     "name": {
                                         "type": "string"
                                     },
                                     "issuer": {
                                         "type": "string"
+                                    },
+                                    "audiences": {
+                                        "type": "array",
+                                        "description": "Token audiences this provider accepts. Tokens with any other aud are rejected.",
+                                        "minItems": 1,
+                                        "maxItems": 8,
+                                        "items": { "type": "string", "minLength": 1 }
                                     },
                                     "remoteJWKS": {
                                         "type": "object",
@@ -46,6 +53,49 @@
                                             },
                                             "cookies": { "type": "array", "items": { "type": "string" } },
                                             "params": { "type": "array", "items": { "type": "string" } }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tenants": {
+                    "type": "array",
+                    "description": "Tenants allowed through the JWT routes and the token claim values that grant each one. Requests matching no entry are denied.",
+                    "items": {
+                        "type": "object",
+                        "required": ["name", "access"],
+                        "additionalProperties": false,
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "Tenant ID, matched exactly against the X-Scope-OrgID header."
+                            },
+                            "access": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {
+                                    "type": "object",
+                                    "required": ["provider", "values"],
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "provider": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "description": "Name of an auth.jwt.providers entry."
+                                        },
+                                        "claim": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "description": "String-array claim to match. Defaults to groups."
+                                        },
+                                        "values": {
+                                            "type": "array",
+                                            "minItems": 1,
+                                            "maxItems": 128,
+                                            "items": { "type": "string", "minLength": 1 }
                                         }
                                     }
                                 }

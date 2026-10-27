@@ -2,7 +2,7 @@
 Mimir SecurityPolicy (mimir.enabled=true)
 
 Applies JWT to both Mimir HTTPRoutes (read and write) in a single policy.
-Auth is configured via auth.jwt.providers.
+Authentication is configured via auth.jwt.providers, tenant access via auth.tenants.
 */}}
 {{- if and .Values.mimir.enabled .Values.auth.jwt.providers -}}
 ---
@@ -24,4 +24,5 @@ spec:
   jwt:
     providers:
       {{- toYaml .Values.auth.jwt.providers | nindent 6 }}
+  {{- include "auth.authorization" . | nindent 2 }}
 {{- end }}

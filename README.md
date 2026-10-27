@@ -94,7 +94,7 @@ The table below describes the JWT domain. When `basicAuth.enabled` is set, the M
 
 All routes (read and write) require JWT Bearer token authentication via Envoy Gateway `SecurityPolicy`.
 
-All routes additionally enforce that the `X-Scope-OrgID` header is present and non-empty — requests missing it receive a `401`.
+Each request is then authorized per tenant: its `X-Scope-OrgID` header must equal a tenant listed in `auth.tenants`, and its token must carry one of the claim values listed for that tenant and the provider that validated it. Everything else, including a missing header, gets a `403`.
 
 Optionally, the Mimir and Loki *read* paths can additionally be exposed on a second hostname behind HTTP Basic Auth, for clients that cannot obtain an OIDC token — see [Basic Auth read routes](docs/basic-auth.md). This is disabled by default.
 
@@ -108,15 +108,41 @@ auth:
     providers:
     - name: dex
       issuer: "https://dex.mycluster.example.com"
+      audiences:
+      - observability-platform-api
       remoteJWKS:
         uri: "https://dex.mycluster.example.com/keys"
     - name: azure-ad
       issuer: "https://login.microsoftonline.com/<tenant-id>/v2.0"
+      audiences:
+      - "<application-id-uri>"
       remoteJWKS:
         uri: "https://login.microsoftonline.com/<tenant-id>/discovery/v2.0/keys"
 ```
 
-Multiple OIDC providers are supported — tokens from any configured issuer are accepted. This handles both human users (OIDC sessions via Dex, Azure AD, etc.) and applications (Azure AD service principals, any OIDC-compliant IdP). Helm template strings are supported in all fields.
+Multiple OIDC providers are supported. This handles both human users (OIDC sessions via Dex, Azure AD, etc.) and applications (Azure AD service principals, any OIDC-compliant IdP). Every provider must set `audiences` (1 to 8 entries); tokens issued for any other audience are rejected. Helm template strings are supported in all fields.
+
+#### Configuring tenant access
+
+`auth.tenants` lists the tenants reachable through the JWT routes. For each tenant, `access` names a provider and the values one of which the token's `claim` (default `groups`, a string array) must contain:
+
+```yaml
+auth:
+  tenants:
+  - name: acme
+    access:
+    - provider: dex
+      values:
+      - "acme:observability-admins"
+  - name: giantswarm
+    access:
+    - provider: azure-ad
+      claim: roles
+      values:
+      - "Observability.ReadWrite"
+```
+
+The header is matched exactly and case-sensitively. A header naming several tenants (`acme|giantswarm`) or a repeated header only matches an entry whose `name` is that exact string. An empty list denies every request. The same access applies to read and write routes of Loki, Mimir and Tempo.
 
 ## Architecture Notes
 
@@ -140,7 +166,7 @@ This app creates multiple `HTTPRoute` and `GRPCRoute` resources (one per service
 **Operational Considerations:**
 
 - All routes share the same hostname and `X-Scope-OrgID` enforcement
-- JWT providers (`auth.jwt.providers`) are shared across all services
+- JWT providers (`auth.jwt.providers`) and tenant access (`auth.tenants`) are shared across all services
 - JWT validation is done inline by Envoy Gateway — no external auth service required
 - gRPC routes (`GRPCRoute`) do not support `HTTPRouteFilter` via `ExtensionRef`, so missing `X-Scope-OrgID` on gRPC requests results in a no-route rejection rather than a strict 401
 

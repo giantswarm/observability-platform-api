@@ -1,0 +1,167 @@
+suite: tenant authorization on the JWT SecurityPolicies
+templates:
+  - templates/check-providers.yaml
+  - templates/loki/securitypolicy.yaml
+  - templates/mimir/securitypolicy.yaml
+  - templates/tempo/securitypolicy.yaml
+set:
+  auth:
+    jwt:
+      providers:
+        - name: dex
+          issuer: https://dex.example.com
+          audiences: [observability-platform-api]
+          remoteJWKS:
+            uri: https://dex.example.com/keys
+        - name: azure-ad
+          issuer: https://login.microsoftonline.com/t/v2.0
+          audiences: [api://observability]
+          remoteJWKS:
+            uri: https://login.microsoftonline.com/t/discovery/v2.0/keys
+    tenants:
+      - name: acme
+        access:
+          - provider: dex
+            values: ["acme:observability-admins", "acme:sre"]
+      - name: giantswarm
+        access:
+          - provider: dex
+            values: ["giantswarm:admins"]
+          - provider: azure-ad
+            claim: roles
+            values: ["Observability.ReadWrite"]
+  loki:
+    enabled: true
+    namespace: loki
+  mimir:
+    enabled: true
+    namespace: mimir
+  tempo:
+    enabled: true
+    namespace: tempo
+tests:
+  - it: renders audiences on every provider of every policy
+    template: templates/mimir/securitypolicy.yaml
+    asserts:
+      - equal:
+          path: spec.jwt.providers[0].audiences
+          value: [observability-platform-api]
+      - equal:
+          path: spec.jwt.providers[1].audiences
+          value: [api://observability]
+
+  - it: fails when a provider has no audiences
+    template: templates/check-providers.yaml
+    set:
+      auth.jwt.providers:
+        - name: dex
+          issuer: https://dex.example.com
+          remoteJWKS:
+            uri: https://dex.example.com/keys
+    asserts:
+      - failedTemplate:
+          errorPattern: "audiences"
+
+  - it: fails when a provider has an empty audiences list
+    template: templates/check-providers.yaml
+    set:
+      auth.jwt.providers:
+        - name: dex
+          issuer: https://dex.example.com
+          audiences: []
+          remoteJWKS:
+            uri: https://dex.example.com/keys
+    asserts:
+      - failedTemplate:
+          errorPattern: "audiences"
+
+  - it: fails when a tenant references an unknown provider
+    template: templates/check-providers.yaml
+    set:
+      auth.tenants:
+        - name: acme
+          access:
+            - provider: nope
+              values: ["acme:sre"]
+    asserts:
+      - failedTemplate:
+          errorPattern: "unknown provider"
+
+  - it: denies by default on mimir, loki and tempo
+    templates:
+      - templates/loki/securitypolicy.yaml
+      - templates/mimir/securitypolicy.yaml
+      - templates/tempo/securitypolicy.yaml
+    asserts:
+      - equal:
+          path: spec.authorization.defaultAction
+          value: Deny
+
+  - it: denies everything when no tenant is configured
+    templates:
+      - templates/loki/securitypolicy.yaml
+      - templates/mimir/securitypolicy.yaml
+      - templates/tempo/securitypolicy.yaml
+    set:
+      auth.tenants: []
+    asserts:
+      - equal:
+          path: spec.authorization.defaultAction
+          value: Deny
+      - notExists:
+          path: spec.authorization.rules
+
+  - it: allows a tenant only for its groups from its provider on mimir, loki and tempo
+    templates:
+      - templates/loki/securitypolicy.yaml
+      - templates/mimir/securitypolicy.yaml
+      - templates/tempo/securitypolicy.yaml
+    asserts:
+      - lengthEqual:
+          path: spec.authorization.rules
+          count: 3
+      - contains:
+          path: spec.authorization.rules
+          content:
+            name: acme-dex
+            action: Allow
+            principal:
+              headers:
+                - name: X-Scope-OrgID
+                  values: [acme]
+              jwt:
+                provider: dex
+                claims:
+                  - name: groups
+                    valueType: StringArray
+                    values: ["acme:observability-admins", "acme:sre"]
+      - contains:
+          path: spec.authorization.rules
+          content:
+            name: giantswarm-dex
+            action: Allow
+            principal:
+              headers:
+                - name: X-Scope-OrgID
+                  values: [giantswarm]
+              jwt:
+                provider: dex
+                claims:
+                  - name: groups
+                    valueType: StringArray
+                    values: ["giantswarm:admins"]
+      - contains:
+          path: spec.authorization.rules
+          content:
+            name: giantswarm-azure-ad
+            action: Allow
+            principal:
+              headers:
+                - name: X-Scope-OrgID
+                  values: [giantswarm]
+              jwt:
+                provider: azure-ad
+                claims:
+                  - name: roles
+                    valueType: StringArray
+                    values: ["Observability.ReadWrite"]

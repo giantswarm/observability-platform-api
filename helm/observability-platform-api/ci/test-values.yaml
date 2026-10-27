@@ -3,8 +3,17 @@ auth:
     providers:
     - name: azure-ad
       issuer: "https://login.microsoftonline.com/my-tenant/v2.0"
+      audiences:
+      - "api://observability-platform-api"
       remoteJWKS:
         uri: "https://login.microsoftonline.com/my-tenant/discovery/v2.0/keys"
+  tenants:
+  - name: giantswarm
+    access:
+    - provider: azure-ad
+      claim: roles
+      values:
+      - "Observability.ReadWrite"
 
 basicAuth:
   enabled: true
