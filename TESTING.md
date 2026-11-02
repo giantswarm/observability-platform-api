@@ -233,6 +233,19 @@ curl -si -X POST "$BASE/otlp/v1/metrics" -H "$AUTH"   # expect 401
 curl -si -X POST "$BASE/otlp/v1/metrics" -H "$SCOPE"  # expect 401
 ```
 
+### Tempo — automated end-to-end test
+
+`make test-tempo` runs `hack/test-tempo.sh`. The script writes traces over OTLP HTTP and OTLP gRPC. It reads them back over the Tempo HTTP and gRPC APIs. It checks auth rejections and tenant isolation.
+
+```bash
+make test-tempo BASE_URL="$BASE"
+# expect: "== N/N checks passed" and exit code 0
+```
+
+`TOKEN` is optional. When `TOKEN` is unset, the target gets a Dex token through the device-code flow (`hack/dex-token.sh`). The script header lists the other variables and the dependencies.
+
+The manual Tempo checks below test single routes.
+
 ### Tempo read — HTTP
 
 Backend: `tempo-query-frontend:3200`. Path rewrite: `/tempo` prefix stripped before forwarding.
