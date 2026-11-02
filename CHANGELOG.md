@@ -11,9 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add the `make test-tempo` end-to-end test for Tempo, with the `make dex-token` and `make update-tempo-protoset` helpers.
 
+## [0.6.0] - 2026-10-15
+
 ### Changed
 
+- Change the missing `X-Scope-OrgID` response body from `Bad Request` to `Missing X-Scope-OrgID header` in the Loki, Mimir, Tempo and Basic Auth `headers-check` filters. The status stays `401`.
 - Fail the render when `loki.enabled`, `mimir.enabled` or `tempo.enabled` is true and `auth.jwt.providers` is empty.
+
+### Removed
+
+- Remove the Loki OTLP gRPC route and `loki.write.grpc`. Loki serves OTLP over HTTP only.
 
 ### Fixed
 
@@ -88,7 +95,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add ingress template
 - skaffolding of the application template
 
-[Unreleased]: https://github.com/giantswarm/observability-platform-api/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/giantswarm/observability-platform-api/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/giantswarm/observability-platform-api/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/giantswarm/observability-platform-api/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/giantswarm/observability-platform-api/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/giantswarm/observability-platform-api/compare/v0.2.0...v0.3.0
