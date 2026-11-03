@@ -1,75 +1,46 @@
 {{/*
-Basic Auth read routes (basicAuth.enabled=true)
+Basic Auth routes (basicAuth.enabled=true)
 
-One HTTPRoute per enabled service (Mimir, Loki) exposing that service's
-existing read paths on basicAuth.hostname. The paths, backend service and
-backend port are reused from <service>.read so the two hostnames never drift
-apart — the only difference between these routes and the JWT ones is the
-hostname they answer on and the SecurityPolicy attached to them.
+Each reuses the body of the matching JWT route from <service>/_routes.tpl, so
+the two hostnames never drift apart: the only differences are the hostname, the
+parentRefs, the headers-check filter and the SecurityPolicy attached to them.
 
-Rule 1: matches path + X-Scope-OrgID header (regex ^.+$) -> forwards to backend.
-Rule 2: matches path only (no header) -> returns 401 via HTTPRouteFilter.
+  Read routes (hand-managed users): Mimir and Loki read paths.
+  Write routes (AgentCredential users, basicAuth.agentCredential.enabled):
+    Mimir remote-write (/prometheus prefix stripped) and OTLP metrics,
+    Loki native push and OTLP logs, Tempo OTLP/HTTP and OTLP/gRPC.
 
-The headers-check HTTPRouteFilter is this directory's own (see filters.yaml),
-not the one used by the JWT routes, so the feature can be removed without
-touching any existing template.
+HTTP routes: rule 1 matches path + X-Scope-OrgID header (regex ^.+$) and
+forwards to the backend; rule 2 matches the path alone and returns 401 through
+this directory's own headers-check filter (see filters.yaml). The Mimir
+rewrite filter is the JWT routes' own. The OTLP/gRPC route matches only with
+X-Scope-OrgID present: a request without it gets no route match, as on the
+JWT hostname.
 */}}
 {{- if eq (include "basicauth.configured" .) "true" -}}
 {{- range $name := list "mimir" "loki" }}
 {{- $service := index $.Values $name }}
 {{- if $service.enabled }}
 ---
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: {{ include "resource.default.name" $ }}-{{ $name }}-read-api-basicauth
-  namespace: {{ $service.namespace }}
-  labels:
-    {{- include "labels.common" $ | nindent 4 }}
-spec:
-  {{- with $.Values.basicAuth.parentRefs }}
-  parentRefs:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-  hostnames:
-  - {{ tpl $.Values.basicAuth.hostname $ | quote }}
-  rules:
-  - backendRefs:
-    - name: {{ $service.read.backendService }}
-      namespace: {{ $service.namespace }}
-      port: {{ $service.read.backendPort }}
-    matches:
-    {{- range $service.read.paths }}
-    - path:
-        type: PathPrefix
-        value: {{ . }}
-      headers:
-      - name: X-Scope-OrgID
-        value: "^.+$"
-        type: RegularExpression
-    {{- end }}
-    filters:
-    - type: ResponseHeaderModifier
-      responseHeaderModifier:
-        set:
-        - name: X-Scope-OrgID
-          value: "%REQ(X-Scope-OrgID)%"
-  - backendRefs:
-    - name: {{ $service.read.backendService }}
-      namespace: {{ $service.namespace }}
-      port: {{ $service.read.backendPort }}
-    filters:
-    - type: ExtensionRef
-      extensionRef:
-        group: gateway.envoyproxy.io
-        kind: HTTPRouteFilter
-        name: {{ include "resource.default.name" $ }}-{{ $name }}-basicauth-headers-check
-    matches:
-    {{- range $service.read.paths }}
-    - path:
-        type: PathPrefix
-        value: {{ . }}
-    {{- end }}
+{{ include (printf "%s.route.read" $name) (dict
+  "root" $
+  "name" (printf "%s-%s-read-api-basicauth" (include "resource.default.name" $) $name)
+  "hostname" $.Values.basicAuth.hostname
+  "parentRefs" $.Values.basicAuth.parentRefs
+  "headersCheck" (printf "%s-%s-basicauth-headers-check" (include "resource.default.name" $) $name)
+) }}
 {{- end }}
+{{- end }}
+{{- end }}
+{{- range $backend := include "basicauth.write.backends" . | fromJsonArray }}
+{{- range $route := include "basicauth.write.routes" (dict "root" $ "backend" $backend.name) | fromJsonArray }}
+---
+{{ include $route.template (dict
+  "root" $
+  "name" $route.name
+  "hostname" $.Values.basicAuth.hostname
+  "parentRefs" $.Values.basicAuth.parentRefs
+  "headersCheck" (printf "%s-%s-basicauth-headers-check" (include "resource.default.name" $) $backend.name)
+) }}
 {{- end }}
 {{- end }}

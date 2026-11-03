@@ -57,12 +57,12 @@
         },
         "basicAuth": {
             "type": "object",
-            "description": "Read-only Basic Auth routes for Mimir and Loki, exposed on a dedicated hostname. Stopgap for clients that cannot present an OIDC token; see envoyproxy/gateway#8491.",
+            "description": "Basic Auth routes on a dedicated hostname. Stopgap for clients that cannot present an OIDC token; see envoyproxy/gateway#8491.",
             "properties": {
                 "enabled": { "type": "boolean" },
                 "hostname": {
                     "type": "string",
-                    "description": "Hostname for the Basic Auth read routes. Must differ from the per-service hostname used by the JWT routes, because Envoy Gateway cannot accept both authentication methods on one route. See docs/basic-auth.md."
+                    "description": "Hostname for the Basic Auth routes. Must differ from the per-service hostname used by the JWT routes, because Envoy Gateway cannot accept both authentication methods on one route. See docs/basic-auth.md."
                 },
                 "parentRefs": {
                     "type": "array",
@@ -76,10 +76,44 @@
                 },
                 "usersSecret": {
                     "type": "object",
-                    "description": "Existing Secret holding the htpasswd entries under the .htpasswd key. Not created or managed by this chart.",
+                    "description": "Read routes: existing Secret holding the hand-managed htpasswd entries under the .htpasswd key. Not created or managed by this chart. Never used by the write routes.",
                     "properties": {
                         "name": { "type": "string" },
                         "namespace": { "type": "string" }
+                    }
+                },
+                "agentCredential": {
+                    "type": "object",
+                    "description": "Write routes for Mimir, Loki and Tempo on the Basic Auth hostname, each backend checked against its own AgentCredential users Secret.",
+                    "properties": {
+                        "enabled": { "type": "boolean" },
+                        "usersSecrets": {
+                            "type": "object",
+                            "description": "Users Secret of each backend, holding the htpasswd entries under the .htpasswd key. Not created or managed by this chart; the defaults are the observability-operator's HTTPRoute Secrets. An empty namespace means the backend's namespace; an empty name gives the backend no write routes.",
+                            "properties": {
+                                "metrics": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": { "type": "string" },
+                                        "namespace": { "type": "string" }
+                                    }
+                                },
+                                "logs": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": { "type": "string" },
+                                        "namespace": { "type": "string" }
+                                    }
+                                },
+                                "traces": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": { "type": "string" },
+                                        "namespace": { "type": "string" }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
