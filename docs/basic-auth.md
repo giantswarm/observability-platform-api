@@ -96,6 +96,7 @@ targeting them with that backend's Secret, and the backend's headers-check
   A Secret in another namespace gets its own, which lets only that backend's
   write SecurityPolicy read only that Secret.
 - A backend whose Secret `name` is empty gets no write routes.
+- A backend with **no AgentCredentials** answers `500` on its write routes. The operator writes that backend's Secret only once a credential exists, and leaves its `.htpasswd` empty after the last one is deleted. Envoy Gateway rejects a missing or empty users Secret and fails closed. This is expected: create an AgentCredential for the backend.
 
 ### Both
 
@@ -207,7 +208,7 @@ kubectl get securitypolicy -n mimir <release>-mimir-basicauth-write -o yaml   # 
 |---|---|
 | Every request gets `500` | The `SecurityPolicy` did not translate — see its status for which of the two below it is. Envoy Gateway fails closed rather than serving the routes unauthenticated |
 | `secret <ns>/<name> does not exist` | Secret missing, or `ReferenceGrant` not applied |
-| `secret <ns>/<name> must contain a non-empty ".htpasswd" key` | Wrong key name, or empty value |
+| `secret <ns>/<name> must contain a non-empty ".htpasswd" key` | Wrong key name, or empty value. On a write route this also means the backend has no AgentCredentials yet, or its last one was deleted |
 | Policy accepted, but every request gets `401` | Hash is not `{SHA}` (bcrypt/MD5), or the password does not match |
 | `401` with a valid credential | `X-Scope-OrgID` header missing or empty |
 
