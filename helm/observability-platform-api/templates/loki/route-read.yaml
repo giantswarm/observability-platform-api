@@ -13,57 +13,11 @@ Exposed paths (configured via loki.read.paths):
 */}}
 {{- if and .Values.loki.enabled .Values.auth.jwt.providers -}}
 ---
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: {{ include "resource.default.name" . }}-loki-read-api
-  namespace: {{ .Values.loki.namespace }}
-  labels:
-    {{- include "labels.common" . | nindent 4 }}
-spec:
-  {{- with .Values.loki.parentRefs }}
-  parentRefs:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-  {{- with .Values.loki.hostname }}
-  hostnames:
-  - {{ tpl . $ | quote }}
-  {{- end }}
-  rules:
-  - backendRefs:
-    - name: {{ .Values.loki.read.backendService }}
-      namespace: {{ .Values.loki.namespace }}
-      port: {{ .Values.loki.read.backendPort }}
-    matches:
-    {{- range .Values.loki.read.paths }}
-    - path:
-        type: PathPrefix
-        value: {{ . }}
-      headers:
-      - name: X-Scope-OrgID
-        value: "^.+$"
-        type: RegularExpression
-    {{- end }}
-    filters:
-    - type: ResponseHeaderModifier
-      responseHeaderModifier:
-        set:
-        - name: X-Scope-OrgID
-          value: "%REQ(X-Scope-OrgID)%"
-  - backendRefs:
-    - name: {{ .Values.loki.read.backendService }}
-      namespace: {{ .Values.loki.namespace }}
-      port: {{ .Values.loki.read.backendPort }}
-    filters:
-    - type: ExtensionRef
-      extensionRef:
-        group: gateway.envoyproxy.io
-        kind: HTTPRouteFilter
-        name: {{ include "resource.default.name" . }}-loki-headers-check
-    matches:
-    {{- range .Values.loki.read.paths }}
-    - path:
-        type: PathPrefix
-        value: {{ . }}
-    {{- end }}
+{{ include "loki.route.read" (dict
+  "root" .
+  "name" (printf "%s-loki-read-api" (include "resource.default.name" .))
+  "hostname" .Values.loki.hostname
+  "parentRefs" .Values.loki.parentRefs
+  "headersCheck" (printf "%s-loki-headers-check" (include "resource.default.name" .))
+) }}
 {{- end }}
