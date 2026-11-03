@@ -415,10 +415,12 @@ done
 # expect: True for all
 ```
 
-## 6. Basic Auth read routes
+## 6. Basic Auth routes
 
-Only relevant when `basicAuth.enabled` is set. These routes serve the Mimir and
-Loki read paths on `basicAuth.hostname` behind HTTP Basic Auth instead of a JWT.
+Only relevant when `basicAuth.enabled` is set. In the default `handManaged` mode
+these routes serve the Mimir and Loki read paths on `basicAuth.hostname` behind
+HTTP Basic Auth instead of a JWT; the checks below cover that mode. For
+`agentCredential` mode see [AgentCredential mode](#agentcredential-mode).
 
 ### Helm template check
 
@@ -557,3 +559,26 @@ done
 # A missing ReferenceGrant shows up here as "does not exist" on the secret ref
 kubectl get referencegrant -n monitoring $RELEASE-basicauth-users -o yaml
 ```
+
+### AgentCredential mode
+
+`ci/agentcredential-values.yaml` enables `basicAuth.mode: agentCredential`:
+
+```bash
+helm template observability-platform-api ./helm/observability-platform-api \
+  -f helm/observability-platform-api/ci/agentcredential-values.yaml \
+  | yq 'select(.kind == "SecurityPolicy" and (.metadata.name | test("basicauth"))) | {"name": .metadata.name, "users": .spec.basicAuth.users, "routes": [.spec.targetRefs[].name]}'
+# expect: mimir, loki and tempo policies, each with its own <backend>-gateway-httproute-auth
+# Secret in its own namespace, and no observability-platform-api-basic-auth-credentials
+```
+
+On a cluster, each backend reads its own `{SHA}` htpasswd Secret, which the
+observability-operator writes from AgentCredentials. Run the scenarios above per
+backend, plus the write paths and Tempo (HTTP and gRPC, as in section 4) with
+`-u "$BA_USER:$BA_PASS"` instead of a Bearer token. Two checks matter most:
+
+| Scenario | Expected |
+|----------|----------|
+| Metrics credential on a Mimir read or write path | 2xx |
+| Metrics credential on a Loki or Tempo HTTP path | 401 |
+| Metrics credential on a Tempo gRPC method | grpc-status: 16 |

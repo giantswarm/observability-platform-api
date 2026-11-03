@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add the `make test-tempo` end-to-end test for Tempo, with the `make dex-token` and `make update-tempo-protoset` helpers.
+- Add `basicAuth.mode: agentCredential` to serve Mimir, Loki and Tempo reads and writes on the Basic Auth hostname, checking each backend against its own AgentCredential users Secret; the default `handManaged` mode is unchanged.
 
 ## [0.6.0] - 2026-10-15
 

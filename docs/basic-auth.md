@@ -1,14 +1,38 @@
-# Basic Auth read routes
+# Basic Auth routes
 
-Some clients cannot present an OIDC token. The case this exists for is an
-external, customer-managed Grafana: its core Prometheus and Loki datasources
-have no OAuth2 client-credentials support, and *Forward OAuth identity* only
-covers interactive queries — alerting rules evaluate without a user session, so
-they have no token to forward.
+Some clients cannot present an OIDC token. Two cases exist:
 
-For those clients, `basicAuth.enabled` exposes the **Mimir and Loki read paths**
-on a **separate hostname**, authenticated with HTTP Basic Auth instead of a JWT.
-Write paths and Tempo are not exposed. The JWT routes are untouched.
+- An external, customer-managed Grafana: its core Prometheus and Loki
+  datasources have no OAuth2 client-credentials support, and *Forward OAuth
+  identity* only covers interactive queries. Alerting rules evaluate without a
+  user session, so they have no token to forward.
+- Agents holding an [AgentCredential](https://github.com/giantswarm/observability-operator):
+  self-service, per-agent and per-backend credentials, created, rotated and
+  revoked through Kubernetes.
+
+For those clients, `basicAuth.enabled` serves routes on a **separate hostname**,
+authenticated with HTTP Basic Auth instead of a JWT. The JWT routes are
+untouched, and `auth.jwt.providers` stays required.
+
+## Modes
+
+`basicAuth.mode` picks the source of the users and, with it, what the hostname
+serves.
+
+| | `handManaged` (default) | `agentCredential` |
+|---|---|---|
+| Users Secret | one, `basicAuth.usersSecret`, for every backend | one per backend, `basicAuth.agentCredential.usersSecrets.{metrics,logs,traces}` |
+| Mimir | read | read, remote-write, OTLP metrics |
+| Loki | read | read, native push, OTLP logs |
+| Tempo | none | HTTP and gRPC query, OTLP/HTTP and OTLP/gRPC push |
+| A credential is accepted on | Mimir and Loki | its own backend only |
+
+Each route on the Basic Auth hostname mirrors the paths, rewrites and backends
+of the matching JWT route: they render from the same templates. The write and
+Tempo routes render only in `agentCredential` mode, so a hand-managed read user
+never gains write access.
+
+### handManaged
 
 ```yaml
 basicAuth:
@@ -22,15 +46,55 @@ basicAuth:
     namespace: monitoring   # default
 ```
 
-This renders, per enabled service, an `HTTPRoute` on `basicAuth.hostname`
-reusing that service's existing `read.paths` / `read.backendService` /
-`read.backendPort`, plus a `SecurityPolicy` carrying only `basicAuth`, plus a
-headers-check `HTTPRouteFilter`. A single `ReferenceGrant` in
-`usersSecret.namespace` lets both SecurityPolicies read the one Secret.
+This renders, per enabled service (Mimir, Loki), an `HTTPRoute` on
+`basicAuth.hostname` reusing that service's existing `read.paths` /
+`read.backendService` / `read.backendPort`, plus a `SecurityPolicy` carrying
+only `basicAuth`, plus a headers-check `HTTPRouteFilter`. A single
+`ReferenceGrant` in `usersSecret.namespace` lets both SecurityPolicies read the
+one Secret.
+
+### agentCredential
+
+```yaml
+basicAuth:
+  enabled: true
+  mode: agentCredential
+  hostname: "observability-basicauth.<codename>.<base-domain>"
+  agentCredential:
+    usersSecrets:          # the defaults
+      metrics:
+        name: mimir-gateway-httproute-auth
+        namespace: ""      # empty: mimir.namespace
+      logs:
+        name: loki-gateway-httproute-auth
+        namespace: ""      # empty: loki.namespace
+      traces:
+        name: tempo-gateway-httproute-auth
+        namespace: ""      # empty: tempo.namespace
+```
+
+The defaults are the HTTPRoute Secrets the observability-operator writes for
+each backend from the AgentCredentials. This renders, per enabled service, the
+routes in the table above on `basicAuth.hostname`, one `SecurityPolicy`
+targeting all of them with that backend's Secret, and a headers-check
+`HTTPRouteFilter`. `basicAuth.usersSecret` is ignored.
+
+- A Secret in its backend's namespace (the default) needs no `ReferenceGrant`.
+  A Secret in another namespace gets its own, which lets only that backend's
+  SecurityPolicy read only that Secret.
+- A backend whose Secret `name` is empty is not served on the Basic Auth
+  hostname.
+
+Don't turn this mode on where per-cluster AgentCredentials exist for agents
+that should only write, such as on Giant Swarm management clusters: their
+credentials would also gain read access through the Basic Auth hostname.
+
+### Both modes
 
 `X-Scope-OrgID` is enforced exactly as on the JWT routes: present and non-empty,
-or `401`. Basic Auth authenticates the caller; it does not scope them to a
-tenant — the same is true of the JWT routes today.
+or `401` on HTTP routes. gRPC routes don't match without it, so the request is
+rejected with no route match. Basic Auth authenticates the caller; it does not
+scope them to a tenant. The same is true of the JWT routes today.
 
 > **Prerequisite:** the `giantswarm-default` Gateway's wildcard listener and
 > certificate span a single label, so `basicAuth.hostname` must be of the form
@@ -51,10 +115,13 @@ exactly one auth method, so the two never meet in one filter chain.
 
 ## Basic Auth credential format
 
-The chart does **not** create, template or manage the users Secret. It is
-provisioned and rotated out of band by whoever owns the credentials, so no
-password or password hash passes through this chart's values or through Giant
-Swarm configuration.
+The chart does **not** create, template or manage the users Secrets. In
+`agentCredential` mode the observability-operator writes them. In `handManaged`
+mode the Secret is provisioned and rotated out of band by whoever owns the
+credentials, so no password or password hash passes through this chart's values
+or through Giant Swarm configuration. The rest of this section and
+[Rotation](#rotation) describe `handManaged` mode; the format is the same in
+both.
 
 The chart renders the routes based on the *values* alone — it never looks the
 Secret up in the cluster — so the Secret and the chart can be applied in either
@@ -124,7 +191,7 @@ A malformed Secret surfaces on the `SecurityPolicy` status rather than in the
 chart, since the chart never validates its contents:
 
 ```bash
-kubectl get securitypolicy -n mimir <release>-mimir-basicauth -o yaml
+kubectl get securitypolicy -n mimir <release>-mimir-basicauth -o yaml   # or loki, tempo
 ```
 
 | Symptom | Cause |
@@ -139,8 +206,9 @@ kubectl get securitypolicy -n mimir <release>-mimir-basicauth -o yaml
 credential is not. That distinction is the fastest way to tell a Kubernetes-level
 problem from a credential-level one.
 
-If `basicAuth.enabled` is set but `hostname`, `usersSecret.name` or
-`usersSecret.namespace` is empty *in the values*, nothing is rendered at all —
+If `basicAuth.enabled` is set but `hostname` is empty *in the values*, or in
+`handManaged` mode `usersSecret.name` or `usersSecret.namespace` is, nothing is
+rendered at all —
 the same convention the JWT routes follow with an empty `auth.jwt.providers`.
 This is a values check, not a cluster lookup: a configured but non-existent
 Secret still renders the routes, and produces the `500` above.
@@ -159,7 +227,10 @@ adding `allow_missing` to the basic_auth filter); what remains is the Envoy
 Gateway API for it.
 
 The feature is deliberately self-contained — no existing template references it.
-To remove it: delete `templates/basicauth/`, delete the `basicAuth` block from
+Its routes render from the JWT routes' named templates in
+`templates/<service>/_routes.tpl`, which stay. To remove it: delete
+`templates/basicauth/`, `tests/basicauth_*_test.yaml`,
+`ci/agentcredential-values.yaml`, delete the `basicAuth` block from
 `values.yaml` and `values.schema.json`, and drop the hostname from the parent
 Gateway. To migrate instead of remove, move `basicAuth.users` into the
 per-service `SecurityPolicy` alongside `jwt`.

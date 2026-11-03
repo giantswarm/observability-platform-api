@@ -1,21 +1,45 @@
 {{/*
-ReferenceGrant for the Basic Auth users Secret (basicAuth.enabled=true)
+ReferenceGrants for the Basic Auth users Secrets (basicAuth.enabled=true)
 
-The users Secret lives outside the mimir/loki namespaces so that a single
-object holds the credentials for every service, and so that write access to it
-can be delegated without granting access to a service namespace. Envoy Gateway
-resolves SecurityPolicy secret references across namespaces only when a
-ReferenceGrant permits it.
+Envoy Gateway resolves a SecurityPolicy's Secret reference across namespaces
+only when a ReferenceGrant in the Secret's namespace permits it.
+
+  handManaged: the single users Secret lives outside the mimir/loki namespaces,
+    so that one object holds the credentials for every service and write access
+    to it can be delegated without granting access to a service namespace. One
+    ReferenceGrant lets both SecurityPolicies read it.
+  agentCredential: a Secret in its SecurityPolicy's namespace (the default)
+    needs no grant. A Secret in another namespace gets its own grant, which
+    lets only that backend's SecurityPolicy read only that Secret.
 */}}
-{{- if eq (include "basicauth.configured" .) "true" -}}
+{{- $backends := include "basicauth.backends" . | fromJsonArray }}
+{{- if eq (include "basicauth.mode" .) "agentCredential" }}
+{{- range $backend := $backends }}
+{{- if ne $backend.secretNamespace $backend.namespace }}
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: {{ include "resource.default.name" $ }}-{{ $backend.name }}-basicauth-users
+  namespace: {{ $backend.secretNamespace }}
+  labels:
+    {{- include "labels.common" $ | nindent 4 }}
+spec:
+  from:
+  - group: gateway.envoyproxy.io
+    kind: SecurityPolicy
+    namespace: {{ $backend.namespace }}
+  to:
+  - group: ""
+    kind: Secret
+    name: {{ $backend.secretName }}
+{{- end }}
+{{- end }}
+{{- else if $backends }}
 {{- $namespaces := list }}
-{{- range $name := list "mimir" "loki" }}
-{{- $service := index $.Values $name }}
-{{- if $service.enabled }}
-{{- $namespaces = append $namespaces $service.namespace }}
+{{- range $backends }}
+{{- $namespaces = append $namespaces .namespace }}
 {{- end }}
-{{- end }}
-{{- if $namespaces }}
 ---
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: ReferenceGrant
@@ -35,5 +59,4 @@ spec:
   - group: ""
     kind: Secret
     name: {{ .Values.basicAuth.usersSecret.name }}
-{{- end }}
 {{- end }}

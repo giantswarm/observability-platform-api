@@ -2,7 +2,8 @@
 Basic Auth headers-check filters (basicAuth.enabled=true)
 
 Returns 401 when the X-Scope-OrgID header is missing, mirroring the enforcement
-the JWT routes get from <service>/filters.yaml.
+the JWT routes get from <service>/filters.yaml. One per backend served on the
+Basic Auth hostname (see basicauth.backends).
 
 These duplicate the per-service headers-check filters rather than reusing them
 so that the whole Basic Auth feature stays inside this directory: removing it
@@ -10,16 +11,13 @@ is a matter of deleting templates/basicauth and the basicAuth values block,
 with no edits to the JWT templates. The objects are inert directResponse
 filters, so the duplication costs nothing at runtime.
 */}}
-{{- if eq (include "basicauth.configured" .) "true" -}}
-{{- range $name := list "mimir" "loki" }}
-{{- $service := index $.Values $name }}
-{{- if $service.enabled }}
+{{- range $backend := include "basicauth.backends" . | fromJsonArray }}
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: HTTPRouteFilter
 metadata:
-  name: {{ include "resource.default.name" $ }}-{{ $name }}-basicauth-headers-check
-  namespace: {{ $service.namespace }}
+  name: {{ include "resource.default.name" $ }}-{{ $backend.name }}-basicauth-headers-check
+  namespace: {{ $backend.namespace }}
   labels:
     {{- include "labels.common" $ | nindent 4 }}
 spec:
@@ -29,6 +27,4 @@ spec:
     body:
       type: Inline
       inline: "Missing X-Scope-OrgID header"
-{{- end }}
-{{- end }}
 {{- end }}
