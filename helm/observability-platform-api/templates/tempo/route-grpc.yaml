@@ -19,12 +19,41 @@ Exposed gRPC paths:
 */}}
 {{- if and .Values.tempo.enabled .Values.auth.jwt.providers -}}
 ---
-{{ include "tempo.route.grpc.read" (dict
-  "root" .
-  "name" (printf "%s-tempo-read-api-grpc" (include "resource.default.name" .))
-  "hostname" .Values.tempo.hostname
-  "parentRefs" .Values.tempo.parentRefs
-) }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo-read-api-grpc
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  {{- with .Values.tempo.parentRefs }}
+  parentRefs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.tempo.hostname }}
+  hostnames:
+  - {{ tpl . $ | quote }}
+  {{- end }}
+  rules:
+  - backendRefs:
+    - name: {{ .Values.tempo.read.grpc.backendService }}
+      namespace: {{ .Values.tempo.namespace }}
+      port: {{ .Values.tempo.read.grpc.backendPort }}
+    matches:
+    - method:
+        service: "tempopb\\.[^/]+"
+        type: RegularExpression
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    filters:
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set:
+        - name: X-Scope-OrgID
+          value: "%REQ(X-Scope-OrgID)%"
 ---
 {{ include "tempo.route.grpc.write" (dict
   "root" .

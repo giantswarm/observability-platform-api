@@ -12,11 +12,62 @@ Exposed paths (configured via tempo.readPaths, all rewritten: /tempo prefix remo
 */}}
 {{- if and .Values.tempo.enabled .Values.auth.jwt.providers -}}
 ---
-{{ include "tempo.route.read" (dict
-  "root" .
-  "name" (printf "%s-tempo-read-api" (include "resource.default.name" .))
-  "hostname" .Values.tempo.hostname
-  "parentRefs" .Values.tempo.parentRefs
-  "headersCheck" (printf "%s-tempo-headers-check" (include "resource.default.name" .))
-) }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "resource.default.name" . }}-tempo-read-api
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  {{- with .Values.tempo.parentRefs }}
+  parentRefs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.tempo.hostname }}
+  hostnames:
+  - {{ tpl . $ | quote }}
+  {{- end }}
+  rules:
+  - backendRefs:
+    - name: tempo-query-frontend
+      namespace: {{ .Values.tempo.namespace }}
+      port: 3200
+    matches:
+    {{- range .Values.tempo.read.paths }}
+    - path:
+        type: PathPrefix
+        value: {{ . }}
+      headers:
+      - name: X-Scope-OrgID
+        value: "^.+$"
+        type: RegularExpression
+    {{- end }}
+    filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: {{ include "resource.default.name" . }}-tempo-rewrite
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set:
+        - name: X-Scope-OrgID
+          value: "%REQ(X-Scope-OrgID)%"
+  - backendRefs:
+    - name: tempo-query-frontend
+      namespace: {{ .Values.tempo.namespace }}
+      port: 3200
+    filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: gateway.envoyproxy.io
+        kind: HTTPRouteFilter
+        name: {{ include "resource.default.name" . }}-tempo-headers-check
+    matches:
+    {{- range .Values.tempo.read.paths }}
+    - path:
+        type: PathPrefix
+        value: {{ . }}
+    {{- end }}
 {{- end }}

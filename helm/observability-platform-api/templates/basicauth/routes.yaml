@@ -1,22 +1,39 @@
 {{/*
 Basic Auth routes (basicAuth.enabled=true)
 
-The routes of each backend served on basicAuth.hostname (see basicauth.routes
-for which ones each mode renders). Each reuses the body of the matching JWT
-route from <service>/_routes.tpl, so the two hostnames never drift apart: the
-only differences are the hostname, the parentRefs, the headers-check filter and
-the SecurityPolicy attached to them.
+Each reuses the body of the matching JWT route from <service>/_routes.tpl, so
+the two hostnames never drift apart: the only differences are the hostname, the
+parentRefs, the headers-check filter and the SecurityPolicy attached to them.
+
+  Read routes (hand-managed users): Mimir and Loki read paths.
+  Write routes (AgentCredential users, basicAuth.agentCredential.enabled):
+    Mimir remote-write (/prometheus prefix stripped) and OTLP metrics,
+    Loki native push and OTLP logs, Tempo OTLP/HTTP and OTLP/gRPC.
 
 HTTP routes: rule 1 matches path + X-Scope-OrgID header (regex ^.+$) and
 forwards to the backend; rule 2 matches the path alone and returns 401 through
-this directory's own headers-check filter (see filters.yaml). The path rewrite
-filters (Mimir remote-write, Tempo read) are the JWT routes' own.
-
-gRPC routes match only with X-Scope-OrgID present: a request without it gets
-no route match, as on the JWT hostname.
+this directory's own headers-check filter (see filters.yaml). The Mimir
+rewrite filter is the JWT routes' own. The OTLP/gRPC route matches only with
+X-Scope-OrgID present: a request without it gets no route match, as on the
+JWT hostname.
 */}}
-{{- range $backend := include "basicauth.backends" . | fromJsonArray }}
-{{- range $route := include "basicauth.routes" (dict "root" $ "backend" $backend.name) | fromJsonArray }}
+{{- if eq (include "basicauth.configured" .) "true" -}}
+{{- range $name := list "mimir" "loki" }}
+{{- $service := index $.Values $name }}
+{{- if $service.enabled }}
+---
+{{ include (printf "%s.route.read" $name) (dict
+  "root" $
+  "name" (printf "%s-%s-read-api-basicauth" (include "resource.default.name" $) $name)
+  "hostname" $.Values.basicAuth.hostname
+  "parentRefs" $.Values.basicAuth.parentRefs
+  "headersCheck" (printf "%s-%s-basicauth-headers-check" (include "resource.default.name" $) $name)
+) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- range $backend := include "basicauth.write.backends" . | fromJsonArray }}
+{{- range $route := include "basicauth.write.routes" (dict "root" $ "backend" $backend.name) | fromJsonArray }}
 ---
 {{ include $route.template (dict
   "root" $

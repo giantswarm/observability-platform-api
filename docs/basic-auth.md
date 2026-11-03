@@ -14,25 +14,38 @@ For those clients, `basicAuth.enabled` serves routes on a **separate hostname**,
 authenticated with HTTP Basic Auth instead of a JWT. The JWT routes are
 untouched, and `auth.jwt.providers` stays required.
 
-## Modes
+## Reads and writes
 
-`basicAuth.mode` picks the source of the users and, with it, what the hostname
-serves.
+The hostname serves two independent route sets, each with its own users:
 
-| | `handManaged` (default) | `agentCredential` |
+| | Read routes | Write routes |
 |---|---|---|
-| Users Secret | one, `basicAuth.usersSecret`, for every backend | one per backend, `basicAuth.agentCredential.usersSecrets.{metrics,logs,traces}` |
-| Mimir | read | read, remote-write, OTLP metrics |
-| Loki | read | read, native push, OTLP logs |
-| Tempo | none | HTTP and gRPC query, OTLP/HTTP and OTLP/gRPC push |
-| A credential is accepted on | Mimir and Loki | its own backend only |
+| Users | hand-managed, one Secret: `basicAuth.usersSecret` | AgentCredentials, one Secret per backend: `basicAuth.agentCredential.usersSecrets.{metrics,logs,traces}` |
+| Mimir | read paths | remote-write (`/prometheus` prefix stripped), OTLP metrics |
+| Loki | read paths | native push, OTLP logs |
+| Tempo | none (JWT only) | OTLP/HTTP, OTLP/gRPC |
+| Rendered when | `usersSecret.name` and `.namespace` are set (the defaults) | `agentCredential.enabled` is set (off by default) |
+
+Both sets need `basicAuth.enabled` and `basicAuth.hostname`, and either can run
+without the other: set `usersSecret.name: ""` to serve writes only.
+
+Each route carries exactly one `SecurityPolicy`, and each policy reads exactly
+one Secret: `<release>-<service>-basicauth` checks the read route against the
+hand-managed Secret, `<release>-<service>-basicauth-write` checks that backend's
+write routes against its AgentCredential Secret. So:
+
+- a hand-managed read user gets `401` on every write route;
+- an AgentCredential gets `401` on every read route;
+- an AgentCredential for one backend gets `401` on the other backends' write
+  routes.
+
+In short, reads use hand-managed htpasswd users or a JWT, and writes use
+AgentCredentials or a JWT.
 
 Each route on the Basic Auth hostname mirrors the paths, rewrites and backends
-of the matching JWT route: they render from the same templates. The write and
-Tempo routes render only in `agentCredential` mode, so a hand-managed read user
-never gains write access.
+of the matching JWT route: they render from the same templates.
 
-### handManaged
+### Read routes
 
 ```yaml
 basicAuth:
@@ -53,14 +66,14 @@ only `basicAuth`, plus a headers-check `HTTPRouteFilter`. A single
 `ReferenceGrant` in `usersSecret.namespace` lets both SecurityPolicies read the
 one Secret.
 
-### agentCredential
+### Write routes
 
 ```yaml
 basicAuth:
   enabled: true
-  mode: agentCredential
   hostname: "observability-basicauth.<codename>.<base-domain>"
   agentCredential:
+    enabled: true
     usersSecrets:          # the defaults
       metrics:
         name: mimir-gateway-httproute-auth
@@ -75,26 +88,21 @@ basicAuth:
 
 The defaults are the HTTPRoute Secrets the observability-operator writes for
 each backend from the AgentCredentials. This renders, per enabled service, the
-routes in the table above on `basicAuth.hostname`, one `SecurityPolicy`
-targeting all of them with that backend's Secret, and a headers-check
-`HTTPRouteFilter`. `basicAuth.usersSecret` is ignored.
+write routes in the table above on `basicAuth.hostname`, one `SecurityPolicy`
+targeting them with that backend's Secret, and the backend's headers-check
+`HTTPRouteFilter` (shared with its read route, if any).
 
 - A Secret in its backend's namespace (the default) needs no `ReferenceGrant`.
   A Secret in another namespace gets its own, which lets only that backend's
-  SecurityPolicy read only that Secret.
-- A backend whose Secret `name` is empty is not served on the Basic Auth
-  hostname.
+  write SecurityPolicy read only that Secret.
+- A backend whose Secret `name` is empty gets no write routes.
 
-Don't turn this mode on where per-cluster AgentCredentials exist for agents
-that should only write, such as on Giant Swarm management clusters: their
-credentials would also gain read access through the Basic Auth hostname.
-
-### Both modes
+### Both
 
 `X-Scope-OrgID` is enforced exactly as on the JWT routes: present and non-empty,
-or `401` on HTTP routes. gRPC routes don't match without it, so the request is
-rejected with no route match. Basic Auth authenticates the caller; it does not
-scope them to a tenant. The same is true of the JWT routes today.
+or `401` on HTTP routes. The OTLP/gRPC route doesn't match without it, so the
+request is rejected with no route match. Basic Auth authenticates the caller;
+it does not scope them to a tenant. The same is true of the JWT routes today.
 
 > **Prerequisite:** the `giantswarm-default` Gateway's wildcard listener and
 > certificate span a single label, so `basicAuth.hostname` must be of the form
@@ -115,13 +123,13 @@ exactly one auth method, so the two never meet in one filter chain.
 
 ## Basic Auth credential format
 
-The chart does **not** create, template or manage the users Secrets. In
-`agentCredential` mode the observability-operator writes them. In `handManaged`
-mode the Secret is provisioned and rotated out of band by whoever owns the
-credentials, so no password or password hash passes through this chart's values
-or through Giant Swarm configuration. The rest of this section and
-[Rotation](#rotation) describe `handManaged` mode; the format is the same in
-both.
+The chart does **not** create, template or manage the users Secrets. The
+observability-operator writes the AgentCredential Secrets of the write routes.
+The hand-managed Secret of the read routes is provisioned and rotated out of
+band by whoever owns the credentials, so no password or password hash passes
+through this chart's values or through Giant Swarm configuration. The rest of
+this section and [Rotation](#rotation) describe the hand-managed Secret; the
+format is the same for both.
 
 The chart renders the routes based on the *values* alone — it never looks the
 Secret up in the cluster — so the Secret and the chart can be applied in either
@@ -191,7 +199,8 @@ A malformed Secret surfaces on the `SecurityPolicy` status rather than in the
 chart, since the chart never validates its contents:
 
 ```bash
-kubectl get securitypolicy -n mimir <release>-mimir-basicauth -o yaml   # or loki, tempo
+kubectl get securitypolicy -n mimir <release>-mimir-basicauth -o yaml         # read
+kubectl get securitypolicy -n mimir <release>-mimir-basicauth-write -o yaml   # write (also loki, tempo)
 ```
 
 | Symptom | Cause |
@@ -206,9 +215,9 @@ kubectl get securitypolicy -n mimir <release>-mimir-basicauth -o yaml   # or lok
 credential is not. That distinction is the fastest way to tell a Kubernetes-level
 problem from a credential-level one.
 
-If `basicAuth.enabled` is set but `hostname` is empty *in the values*, or in
-`handManaged` mode `usersSecret.name` or `usersSecret.namespace` is, nothing is
-rendered at all —
+If `basicAuth.enabled` is set but `hostname` is empty *in the values*, nothing
+is rendered at all; if `usersSecret.name` or `usersSecret.namespace` is, no read
+route is —
 the same convention the JWT routes follow with an empty `auth.jwt.providers`.
 This is a values check, not a cluster lookup: a configured but non-existent
 Secret still renders the routes, and produces the `500` above.

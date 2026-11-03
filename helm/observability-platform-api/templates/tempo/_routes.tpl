@@ -1,9 +1,10 @@
 {{/* vim: set filetype=mustache: */}}
 
 {{/*
-Tempo route bodies, shared by the JWT routes (tempo/route-*.yaml) and the Basic
-Auth routes (basicauth/routes.yaml) so the two hostnames serve the same paths,
-rewrites and backends.
+Tempo write route bodies, shared by the JWT write routes (tempo/route-write.yaml,
+tempo/route-grpc.yaml) and the Basic Auth write routes (basicauth/routes.yaml)
+so the two hostnames serve the same paths and backends. The read routes have no
+Basic Auth counterpart and stay inline.
 
 Each template takes a dict:
   root:         the chart's root context
@@ -13,74 +14,6 @@ Each template takes a dict:
   headersCheck: the name of the HTTPRouteFilter returning 401 when X-Scope-OrgID is
                 missing (HTTPRoutes only: a GRPCRoute cannot reference an HTTPRouteFilter)
 */}}
-
-{{/*
-Tempo HTTP read HTTPRoute (tempo-query-frontend:3200).
-  Rule 1: matches path + X-Scope-OrgID header → strips /tempo prefix and forwards.
-  Rule 2: matches path only (no header) → returns 401 via HTTPRouteFilter.
-*/}}
-{{- define "tempo.route.read" -}}
-{{- $root := .root -}}
-{{- $tempo := $root.Values.tempo -}}
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: {{ .name }}
-  namespace: {{ $tempo.namespace }}
-  labels:
-    {{- include "labels.common" $root | nindent 4 }}
-spec:
-  {{- with .parentRefs }}
-  parentRefs:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-  {{- with .hostname }}
-  hostnames:
-  - {{ tpl . $root | quote }}
-  {{- end }}
-  rules:
-  - backendRefs:
-    - name: tempo-query-frontend
-      namespace: {{ $tempo.namespace }}
-      port: 3200
-    matches:
-    {{- range $tempo.read.paths }}
-    - path:
-        type: PathPrefix
-        value: {{ . }}
-      headers:
-      - name: X-Scope-OrgID
-        value: "^.+$"
-        type: RegularExpression
-    {{- end }}
-    filters:
-    - type: ExtensionRef
-      extensionRef:
-        group: gateway.envoyproxy.io
-        kind: HTTPRouteFilter
-        name: {{ include "resource.default.name" $root }}-tempo-rewrite
-    - type: ResponseHeaderModifier
-      responseHeaderModifier:
-        set:
-        - name: X-Scope-OrgID
-          value: "%REQ(X-Scope-OrgID)%"
-  - backendRefs:
-    - name: tempo-query-frontend
-      namespace: {{ $tempo.namespace }}
-      port: 3200
-    filters:
-    - type: ExtensionRef
-      extensionRef:
-        group: gateway.envoyproxy.io
-        kind: HTTPRouteFilter
-        name: {{ .headersCheck }}
-    matches:
-    {{- range $tempo.read.paths }}
-    - path:
-        type: PathPrefix
-        value: {{ . }}
-    {{- end }}
-{{- end -}}
 
 {{/*
 Tempo OTLP/HTTP write HTTPRoute (tempo-distributor:4318).
@@ -143,51 +76,6 @@ spec:
         type: PathPrefix
         value: {{ . }}
   {{- end }}
-{{- end -}}
-
-{{/*
-Tempo gRPC read GRPCRoute (tempo.read.grpc backend).
-  Single rule: matches tempopb.* service + X-Scope-OrgID header → forwards to backend.
-  Requests missing X-Scope-OrgID do not match and are rejected by Envoy (no route match).
-*/}}
-{{- define "tempo.route.grpc.read" -}}
-{{- $root := .root -}}
-{{- $tempo := $root.Values.tempo -}}
-apiVersion: gateway.networking.k8s.io/v1
-kind: GRPCRoute
-metadata:
-  name: {{ .name }}
-  namespace: {{ $tempo.namespace }}
-  labels:
-    {{- include "labels.common" $root | nindent 4 }}
-spec:
-  {{- with .parentRefs }}
-  parentRefs:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-  {{- with .hostname }}
-  hostnames:
-  - {{ tpl . $root | quote }}
-  {{- end }}
-  rules:
-  - backendRefs:
-    - name: {{ $tempo.read.grpc.backendService }}
-      namespace: {{ $tempo.namespace }}
-      port: {{ $tempo.read.grpc.backendPort }}
-    matches:
-    - method:
-        service: "tempopb\\.[^/]+"
-        type: RegularExpression
-      headers:
-      - name: X-Scope-OrgID
-        value: "^.+$"
-        type: RegularExpression
-    filters:
-    - type: ResponseHeaderModifier
-      responseHeaderModifier:
-        set:
-        - name: X-Scope-OrgID
-          value: "%REQ(X-Scope-OrgID)%"
 {{- end -}}
 
 {{/*

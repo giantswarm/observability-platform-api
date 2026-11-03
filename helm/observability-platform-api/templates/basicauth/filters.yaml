@@ -2,8 +2,8 @@
 Basic Auth headers-check filters (basicAuth.enabled=true)
 
 Returns 401 when the X-Scope-OrgID header is missing, mirroring the enforcement
-the JWT routes get from <service>/filters.yaml. One per backend served on the
-Basic Auth hostname (see basicauth.backends).
+the JWT routes get from <service>/filters.yaml. One per backend with a Basic
+Auth route, shared by its read and write routes.
 
 These duplicate the per-service headers-check filters rather than reusing them
 so that the whole Basic Auth feature stays inside this directory: removing it
@@ -11,13 +11,20 @@ is a matter of deleting templates/basicauth and the basicAuth values block,
 with no edits to the JWT templates. The objects are inert directResponse
 filters, so the duplication costs nothing at runtime.
 */}}
-{{- range $backend := include "basicauth.backends" . | fromJsonArray }}
+{{- $read := eq (include "basicauth.configured" .) "true" }}
+{{- $write := list }}
+{{- range include "basicauth.write.backends" . | fromJsonArray }}
+{{- $write = append $write .name }}
+{{- end }}
+{{- range $name := list "mimir" "loki" "tempo" }}
+{{- $service := index $.Values $name }}
+{{- if or (and $read $service.enabled (ne $name "tempo")) (has $name $write) }}
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: HTTPRouteFilter
 metadata:
-  name: {{ include "resource.default.name" $ }}-{{ $backend.name }}-basicauth-headers-check
-  namespace: {{ $backend.namespace }}
+  name: {{ include "resource.default.name" $ }}-{{ $name }}-basicauth-headers-check
+  namespace: {{ $service.namespace }}
   labels:
     {{- include "labels.common" $ | nindent 4 }}
 spec:
@@ -27,4 +34,5 @@ spec:
     body:
       type: Inline
       inline: "Missing X-Scope-OrgID header"
+{{- end }}
 {{- end }}

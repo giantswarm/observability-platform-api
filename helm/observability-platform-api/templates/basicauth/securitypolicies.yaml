@@ -1,11 +1,16 @@
 {{/*
 Basic Auth SecurityPolicies (basicAuth.enabled=true)
 
-One SecurityPolicy per backend served on the Basic Auth hostname, targeting
-only that backend's Basic Auth routes and configuring `basicAuth` alone. Its
-users Secret is basicAuth.usersSecret in handManaged mode, and the backend's
-own Secret in agentCredential mode, so a credential for one backend is refused
-on the others.
+Reads and writes are authenticated by separate policies on separate routes:
+
+  <service>-basicauth:       the Mimir or Loki read route, checked against the
+                             hand-managed basicAuth.usersSecret.
+  <service>-basicauth-write: the backend's write routes, checked against its own
+                             AgentCredential Secret (basicAuth.agentCredential).
+
+So a hand-managed read user is refused on the write routes, an AgentCredential
+is refused on the read routes, and an AgentCredential for one backend is
+refused on the others' write routes.
 
 These are deliberately separate from the JWT SecurityPolicies rather than a
 `basicAuth` block added to them: Envoy Gateway runs the jwt and basicAuth
@@ -13,18 +18,42 @@ filters sequentially with AND semantics, so a route carrying both rejects
 every request regardless of which credential it presents
 (https://github.com/envoyproxy/gateway/issues/8491).
 */}}
-{{- range $backend := include "basicauth.backends" . | fromJsonArray }}
+{{- if eq (include "basicauth.configured" .) "true" -}}
+{{- range $name := list "mimir" "loki" }}
+{{- $service := index $.Values $name }}
+{{- if $service.enabled }}
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata:
-  name: {{ include "resource.default.name" $ }}-{{ $backend.name }}-basicauth
+  name: {{ include "resource.default.name" $ }}-{{ $name }}-basicauth
+  namespace: {{ $service.namespace }}
+  labels:
+    {{- include "labels.common" $ | nindent 4 }}
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ include "resource.default.name" $ }}-{{ $name }}-read-api-basicauth
+  basicAuth:
+    users:
+      name: {{ $.Values.basicAuth.usersSecret.name }}
+      namespace: {{ $.Values.basicAuth.usersSecret.namespace }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- range $backend := include "basicauth.write.backends" . | fromJsonArray }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: {{ include "resource.default.name" $ }}-{{ $backend.name }}-basicauth-write
   namespace: {{ $backend.namespace }}
   labels:
     {{- include "labels.common" $ | nindent 4 }}
 spec:
   targetRefs:
-  {{- range $route := include "basicauth.routes" (dict "root" $ "backend" $backend.name) | fromJsonArray }}
+  {{- range $route := include "basicauth.write.routes" (dict "root" $ "backend" $backend.name) | fromJsonArray }}
   - group: gateway.networking.k8s.io
     kind: {{ $route.kind }}
     name: {{ $route.name }}

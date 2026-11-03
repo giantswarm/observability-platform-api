@@ -34,7 +34,7 @@ This repository contains the Helm chart and configuration templates for creating
 
 The observability-platform-api creates `HTTPRoute` and `GRPCRoute` resources under a unified domain for direct access to observability backends. Each route is secured by an Envoy Gateway `SecurityPolicy` (JWT) and enforces the `X-Scope-OrgID` tenant header.
 
-The table below describes the JWT domain. When `basicAuth.enabled` is set, rows are additionally served on `basicAuth.hostname` behind Basic Auth: the Mimir and Loki read rows in the default `handManaged` mode, and every row in `agentCredential` mode (see [Basic Auth routes](docs/basic-auth.md)).
+The table below describes the JWT domain. When `basicAuth.enabled` is set, the Mimir and Loki read rows are additionally served on `basicAuth.hostname` behind hand-managed Basic Auth users. With `basicAuth.agentCredential.enabled`, the Mimir, Loki and Tempo write rows are too, behind AgentCredential users (see [Basic Auth routes](docs/basic-auth.md)).
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -96,10 +96,12 @@ All routes (read and write) require JWT Bearer token authentication via Envoy Ga
 
 All routes additionally enforce that the `X-Scope-OrgID` header is present and non-empty — requests missing it receive a `401`.
 
-Optionally, routes can additionally be exposed on a second hostname behind HTTP Basic Auth, for clients that cannot obtain an OIDC token — see [Basic Auth routes](docs/basic-auth.md). This is disabled by default. `basicAuth.mode` picks the source of the users:
+Optionally, routes can additionally be exposed on a second hostname behind HTTP Basic Auth, for clients that cannot obtain an OIDC token — see [Basic Auth routes](docs/basic-auth.md). This is disabled by default. Reads and writes have separate users:
 
-- `handManaged` (default): the Mimir and Loki *read* paths, checked against one hand-managed htpasswd Secret.
-- `agentCredential`: the read and write paths of Mimir, Loki and Tempo, each backend checked against its own htpasswd Secret written by the observability-operator from AgentCredentials. A credential for one backend is refused on the others.
+- **Reads** (Mimir and Loki): one hand-managed htpasswd Secret, `basicAuth.usersSecret`.
+- **Writes** (Mimir, Loki and Tempo, off by default, `basicAuth.agentCredential.enabled`): one htpasswd Secret per backend, written by the observability-operator from AgentCredentials. A credential for one backend is refused on the others.
+
+A hand-managed read user cannot write, and an AgentCredential cannot read.
 
 #### Configuring JWT providers
 
@@ -163,7 +165,7 @@ This app creates multiple `HTTPRoute` and `GRPCRoute` resources (one per service
 
 ### User Documentation
 
-- [**Basic Auth routes**](docs/basic-auth.md) - Optional Basic Auth hostname: hand-managed and AgentCredential modes, credential format, rotation
+- [**Basic Auth routes**](docs/basic-auth.md) - Optional Basic Auth hostname: hand-managed read users and AgentCredential write users, credential format, rotation
 - [**Data Import/Export Guide**](https://docs.giantswarm.io/overview/observability/data-management/data-import-export/) - Public API documentation and usage examples
 - [**Intranet Documentation**](https://intranet.giantswarm.io/docs/observability/gateway/) - Internal operational guides
 

@@ -1,4 +1,4 @@
-suite: basic auth, handManaged mode (default)
+suite: basic auth, hand-managed read routes (default)
 release:
   name: opa
 templates:
@@ -105,3 +105,32 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  - it: renders no write route while agentCredential is disabled
+    set:
+      basicAuth.agentCredential.usersSecrets.metrics.namespace: monitoring
+    template: templates/basicauth/routes.yaml
+    asserts:
+      - hasDocuments:
+          count: 2
+      - notMatchRegex:
+          path: metadata.name
+          pattern: write
+
+  - it: never checks reads against an AgentCredential Secret
+    set:
+      basicAuth.agentCredential.enabled: true
+    template: templates/basicauth/securitypolicies.yaml
+    asserts:
+      - equal:
+          path: spec.basicAuth.users.name
+          value: observability-platform-api-basic-auth-credentials
+        documentSelector:
+          path: metadata.name
+          value: opa-mimir-basicauth
+      - equal:
+          path: spec.basicAuth.users.name
+          value: observability-platform-api-basic-auth-credentials
+        documentSelector:
+          path: metadata.name
+          value: opa-loki-basicauth
