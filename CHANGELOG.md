@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Update architect to v10.18.0 (giantswarm/observability-platform-api#155)
+
 ### Added
 
 - Add the `make test-tempo` end-to-end test for Tempo, with the `make dex-token` and `make update-tempo-protoset` helpers.
