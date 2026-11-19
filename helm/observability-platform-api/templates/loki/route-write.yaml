@@ -13,65 +13,11 @@ Exposed paths (configured via loki.write.paths):
 */}}
 {{- if and .Values.loki.enabled .Values.auth.jwt.providers -}}
 ---
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: {{ include "resource.default.name" . }}-loki-write-api
-  namespace: {{ .Values.loki.namespace }}
-  labels:
-    {{- include "labels.common" . | nindent 4 }}
-spec:
-  {{- with .Values.loki.parentRefs }}
-  parentRefs:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-  {{- with .Values.loki.hostname }}
-  hostnames:
-  - {{ tpl . $ | quote }}
-  {{- end }}
-  rules:
-  {{- range .Values.loki.write.paths }}
-  - backendRefs:
-    - name: {{ $.Values.loki.write.backendService }}
-      namespace: {{ $.Values.loki.namespace }}
-      port: {{ $.Values.loki.write.backendPort }}
-    matches:
-    - path:
-        type: PathPrefix
-        value: {{ . }}
-      headers:
-      - name: X-Scope-OrgID
-        value: "^.+$"
-        type: RegularExpression
-    filters:
-    - type: ResponseHeaderModifier
-      responseHeaderModifier:
-        set:
-        - name: X-Scope-OrgID
-          value: "%REQ(X-Scope-OrgID)%"
-    {{- with $.Values.loki.write.requestMirror }}
-    {{- if .enabled }}
-    {{- /* This rule only: the one below returns 401 for requests without an
-           X-Scope-OrgID header, so mirroring it would copy only rejections. */}}
-    - type: RequestMirror
-      requestMirror:
-        backendRef:
-          {{- toYaml .backendRef | nindent 10 }}
-    {{- end }}
-    {{- end }}
-  - backendRefs:
-    - name: {{ $.Values.loki.write.backendService }}
-      namespace: {{ $.Values.loki.namespace }}
-      port: {{ $.Values.loki.write.backendPort }}
-    filters:
-    - type: ExtensionRef
-      extensionRef:
-        group: gateway.envoyproxy.io
-        kind: HTTPRouteFilter
-        name: {{ include "resource.default.name" $ }}-loki-headers-check
-    matches:
-    - path:
-        type: PathPrefix
-        value: {{ . }}
-  {{- end }}
+{{ include "loki.route.write" (dict
+  "root" .
+  "name" (printf "%s-loki-write-api" (include "resource.default.name" .))
+  "hostname" .Values.loki.hostname
+  "parentRefs" .Values.loki.parentRefs
+  "headersCheck" (printf "%s-loki-headers-check" (include "resource.default.name" .))
+) }}
 {{- end }}

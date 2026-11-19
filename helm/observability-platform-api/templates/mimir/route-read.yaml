@@ -14,57 +14,11 @@ Exposed paths (configured via mimir.readPaths):
 */}}
 {{- if and .Values.mimir.enabled .Values.auth.jwt.providers -}}
 ---
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: {{ include "resource.default.name" . }}-mimir-read-api
-  namespace: {{ .Values.mimir.namespace }}
-  labels:
-    {{- include "labels.common" . | nindent 4 }}
-spec:
-  {{- with .Values.mimir.parentRefs }}
-  parentRefs:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-  {{- with .Values.mimir.hostname }}
-  hostnames:
-  - {{ tpl . $ | quote }}
-  {{- end }}
-  rules:
-  - backendRefs:
-    - name: {{ .Values.mimir.read.backendService }}
-      namespace: {{ .Values.mimir.namespace }}
-      port: {{ .Values.mimir.read.backendPort }}
-    matches:
-    {{- range .Values.mimir.read.paths }}
-    - path:
-        type: PathPrefix
-        value: {{ . }}
-      headers:
-      - name: X-Scope-OrgID
-        value: "^.+$"
-        type: RegularExpression
-    {{- end }}
-    filters:
-    - type: ResponseHeaderModifier
-      responseHeaderModifier:
-        set:
-        - name: X-Scope-OrgID
-          value: "%REQ(X-Scope-OrgID)%"
-  - backendRefs:
-    - name: {{ .Values.mimir.read.backendService }}
-      namespace: {{ .Values.mimir.namespace }}
-      port: {{ .Values.mimir.read.backendPort }}
-    filters:
-    - type: ExtensionRef
-      extensionRef:
-        group: gateway.envoyproxy.io
-        kind: HTTPRouteFilter
-        name: {{ include "resource.default.name" . }}-mimir-headers-check
-    matches:
-    {{- range .Values.mimir.read.paths }}
-    - path:
-        type: PathPrefix
-        value: {{ . }}
-    {{- end }}
+{{ include "mimir.route.read" (dict
+  "root" .
+  "name" (printf "%s-mimir-read-api" (include "resource.default.name" .))
+  "hostname" .Values.mimir.hostname
+  "parentRefs" .Values.mimir.parentRefs
+  "headersCheck" (printf "%s-mimir-headers-check" (include "resource.default.name" .))
+) }}
 {{- end }}
