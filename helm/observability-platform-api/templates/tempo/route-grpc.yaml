@@ -55,39 +55,10 @@ spec:
         - name: X-Scope-OrgID
           value: "%REQ(X-Scope-OrgID)%"
 ---
-apiVersion: gateway.networking.k8s.io/v1
-kind: GRPCRoute
-metadata:
-  name: {{ include "resource.default.name" . }}-tempo-write-api-grpc
-  namespace: {{ .Values.tempo.namespace }}
-  labels:
-    {{- include "labels.common" . | nindent 4 }}
-spec:
-  {{- with .Values.tempo.parentRefs }}
-  parentRefs:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-  {{- with .Values.tempo.hostname }}
-  hostnames:
-  - {{ tpl . $ | quote }}
-  {{- end }}
-  rules:
-  - backendRefs:
-    - name: {{ .Values.tempo.write.grpc.backendService }}
-      namespace: {{ .Values.tempo.namespace }}
-      port: {{ .Values.tempo.write.grpc.backendPort }}
-    matches:
-    - method:
-        service: opentelemetry.proto.collector.trace.v1.TraceService
-        type: Exact
-      headers:
-      - name: X-Scope-OrgID
-        value: "^.+$"
-        type: RegularExpression
-    filters:
-    - type: ResponseHeaderModifier
-      responseHeaderModifier:
-        set:
-        - name: X-Scope-OrgID
-          value: "%REQ(X-Scope-OrgID)%"
+{{ include "tempo.route.grpc.write" (dict
+  "root" .
+  "name" (printf "%s-tempo-write-api-grpc" (include "resource.default.name" .))
+  "hostname" .Values.tempo.hostname
+  "parentRefs" .Values.tempo.parentRefs
+) }}
 {{- end }}

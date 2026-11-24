@@ -415,10 +415,13 @@ done
 # expect: True for all
 ```
 
-## 6. Basic Auth read routes
+## 6. Basic Auth routes
 
-Only relevant when `basicAuth.enabled` is set. These routes serve the Mimir and
-Loki read paths on `basicAuth.hostname` behind HTTP Basic Auth instead of a JWT.
+Only relevant when `basicAuth.enabled` is set. The read routes serve the Mimir
+and Loki read paths on `basicAuth.hostname`, checked against the hand-managed
+users Secret instead of a JWT; the checks below cover them. The AgentCredential
+write routes (`basicAuth.agentCredential.enabled`) are covered in
+[AgentCredential write routes](#agentcredential-write-routes).
 
 ### Helm template check
 
@@ -499,7 +502,7 @@ SCOPE="X-Scope-OrgID: $ORG"
 | No credential | 401 |
 | Wrong password | 401 |
 | Valid JWT (Bearer) instead of Basic | 401 — this hostname only accepts Basic |
-| Valid Basic credentials against a *write* path | 404 — write paths are not exposed here |
+| Valid Basic credentials against a *write* path | 404 — no write route; 401 with `basicAuth.agentCredential.enabled` |
 
 ```bash
 # Mimir read
@@ -511,7 +514,7 @@ curl -si -u "$BA_USER:wrong" "$BA_BASE/prometheus/api/v1/labels" -H "$SCOPE"    
 # Loki read
 curl -si -u "$BA_USER:$BA_PASS" "$BA_BASE/loki/api/v1/labels" -H "$SCOPE"          # expect 2xx
 
-# Write paths must not be reachable on this hostname
+# Read users must not write (401 instead when the AgentCredential write routes are on)
 curl -si -u "$BA_USER:$BA_PASS" -X POST "$BA_BASE/prometheus/api/v1/push" -H "$SCOPE"  # expect 404
 curl -si -u "$BA_USER:$BA_PASS" -X POST "$BA_BASE/loki/api/v1/push" -H "$SCOPE"        # expect 404
 
@@ -557,3 +560,35 @@ done
 # A missing ReferenceGrant shows up here as "does not exist" on the secret ref
 kubectl get referencegrant -n monitoring $RELEASE-basicauth-users -o yaml
 ```
+
+### AgentCredential write routes
+
+`ci/agentcredential-values.yaml` enables `basicAuth.agentCredential.enabled`
+alongside the read routes:
+
+```bash
+helm template observability-platform-api ./helm/observability-platform-api \
+  -f helm/observability-platform-api/ci/agentcredential-values.yaml \
+  | yq 'select(.kind == "SecurityPolicy" and (.metadata.name | test("basicauth"))) | {"name": .metadata.name, "users": .spec.basicAuth.users.name, "routes": [.spec.targetRefs[].name]}'
+# expect: <release>-{mimir,loki}-basicauth on the read routes only, with
+# observability-platform-api-basic-auth-credentials; and <release>-{mimir,loki,tempo}-basicauth-write
+# on the write routes only, each with its own <backend>-gateway-httproute-auth Secret
+```
+
+On a cluster, each backend's write routes read its own `{SHA}` htpasswd Secret,
+which the observability-operator writes from AgentCredentials. Set
+`AC_USER`/`AC_PASS` per backend from the AgentCredential's Secret, and push over
+the write paths of section 4 (Mimir remote-write and OTLP, Loki push and OTLP,
+Tempo OTLP/HTTP and OTLP/gRPC) with `-u "$AC_USER:$AC_PASS"` instead of a
+Bearer token. Read the data back over the JWT hostname or with a read user.
+
+| Scenario | Expected |
+|----------|----------|
+| Metrics credential on a Mimir write path, `X-Scope-OrgID` present | 2xx |
+| Metrics credential on a Mimir write path, `X-Scope-OrgID` missing | 401 |
+| Metrics credential on a Loki or Tempo HTTP write path | 401 |
+| Metrics credential on the Tempo OTLP/gRPC route | grpc-status: 16 |
+| Traces credential on the Tempo OTLP/gRPC route | accepted (not 16) |
+| Any AgentCredential on a Mimir or Loki read path | 401 |
+| Hand-managed read user on any write path | 401 |
+| Any credential on a Tempo read path or gRPC query | 404 / no route — Tempo reads are JWT-only |

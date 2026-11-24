@@ -30,17 +30,26 @@ auth:
     #     - name: Authorization
     #       valuePrefix: "Bearer "
 
-# -- Read-only Basic Auth routes, exposed on a dedicated hostname.
+# -- Basic Auth routes, exposed on a dedicated hostname.
 #
-# Allow external clients (e.g. Grafana) to query Mimir and/or Loki using the
-# basic authentication mechanism.
+# Allow clients that cannot present an OIDC token to reach the backends with
+# HTTP Basic Auth. Two independent route sets, each with its own users:
+#   - reads: Mimir and Loki read paths, checked against the single hand-managed
+#     `usersSecret` (e.g. for an external Grafana). Tempo reads stay JWT-only.
+#   - writes: Mimir, Loki and Tempo write paths, each backend checked against
+#     its own AgentCredential Secret from `agentCredential.usersSecrets`, as
+#     written by the observability-operator. Off by default.
+# A read user cannot write, and an AgentCredential cannot read.
 #
-# Only Mimir and Loki *read* paths are exposed. Write paths and Tempo stay
-# JWT-only.
+# Both need `enabled` and `hostname`. Reads also need `usersSecret.name` and
+# `usersSecret.namespace` (set by default; empty `usersSecret.name` to serve
+# writes only), and writes need `agentCredential.enabled`.
+#
+# See docs/basic-auth.md.
 basicAuth:
-  # -- Enable the Basic Auth read routes.
+  # -- Enable the Basic Auth routes.
   enabled: false
-  # -- Hostname for the Basic Auth read routes. Must differ from the per-service
+  # -- Hostname for the Basic Auth routes. Must differ from the per-service
   # `hostname` used by the JWT routes, because Envoy Gateway cannot accept both
   # authentication methods on one route — see docs/basic-auth.md. Must be covered
   # by a listener on the parent Gateway. Supports Helm template strings.
@@ -49,7 +58,8 @@ basicAuth:
   parentRefs:
   - name: giantswarm-default
     namespace: envoy-gateway-system
-  # -- Existing Secret holding the htpasswd entries under the `.htpasswd` key.
+  # -- Read routes: existing Secret holding the hand-managed htpasswd entries
+  # under the `.htpasswd` key. Never used by the write routes.
   #
   # This chart does not create, template or manage this Secret. It is
   # provisioned and rotated out of band by whoever owns the credentials, so that
@@ -61,6 +71,29 @@ basicAuth:
     # -- Namespace of the existing Secret. A ReferenceGrant is rendered so the
     # per-service SecurityPolicies can read it across namespaces.
     namespace: "monitoring"
+  # -- Write routes, checked against AgentCredential users.
+  agentCredential:
+    # -- Serve the Mimir, Loki and Tempo write paths on `hostname`.
+    enabled: false
+    # -- Users Secret of each backend, holding the htpasswd entries under the
+    # `.htpasswd` key. The defaults are the observability-operator's HTTPRoute
+    # Secrets, never `usersSecret`. An empty `namespace` means the backend's own namespace
+    # (`mimir.namespace`, `loki.namespace`, `tempo.namespace`), where the
+    # SecurityPolicy needs no ReferenceGrant; any other namespace gets one. A
+    # backend with an empty `name` gets no write routes.
+    usersSecrets:
+      # -- Mimir.
+      metrics:
+        name: "mimir-gateway-httproute-auth"
+        namespace: ""
+      # -- Loki.
+      logs:
+        name: "loki-gateway-httproute-auth"
+        namespace: ""
+      # -- Tempo.
+      traces:
+        name: "tempo-gateway-httproute-auth"
+        namespace: ""
 
 loki:
   enabled: false

@@ -1,8 +1,16 @@
 {{/*
 Basic Auth SecurityPolicies (basicAuth.enabled=true)
 
-One SecurityPolicy per enabled service, targeting only that service's Basic
-Auth HTTPRoute and configuring `basicAuth` alone.
+Reads and writes are authenticated by separate policies on separate routes:
+
+  <service>-basicauth:       the Mimir or Loki read route, checked against the
+                             hand-managed basicAuth.usersSecret.
+  <service>-basicauth-write: the backend's write routes, checked against its own
+                             AgentCredential Secret (basicAuth.agentCredential).
+
+So a hand-managed read user is refused on the write routes, an AgentCredential
+is refused on the read routes, and an AgentCredential for one backend is
+refused on the others' write routes.
 
 These are deliberately separate from the JWT SecurityPolicies rather than a
 `basicAuth` block added to them: Envoy Gateway runs the jwt and basicAuth
@@ -33,4 +41,25 @@ spec:
       namespace: {{ $.Values.basicAuth.usersSecret.namespace }}
 {{- end }}
 {{- end }}
+{{- end }}
+{{- range $backend := include "basicauth.write.backends" . | fromJsonArray }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: {{ include "resource.default.name" $ }}-{{ $backend.name }}-basicauth-write
+  namespace: {{ $backend.namespace }}
+  labels:
+    {{- include "labels.common" $ | nindent 4 }}
+spec:
+  targetRefs:
+  {{- range $route := include "basicauth.write.routes" (dict "root" $ "backend" $backend.name) | fromJsonArray }}
+  - group: gateway.networking.k8s.io
+    kind: {{ $route.kind }}
+    name: {{ $route.name }}
+  {{- end }}
+  basicAuth:
+    users:
+      name: {{ $backend.secretName }}
+      namespace: {{ $backend.secretNamespace }}
 {{- end }}
